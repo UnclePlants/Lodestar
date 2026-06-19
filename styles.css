@@ -1499,7 +1499,9 @@ input:disabled {
   border-radius: 6px;
   color: var(--text);
   min-height: 36px;
+  min-width: 0; /* let the grid columns shrink so the row never overflows the panel */
   padding: 0 10px;
+  width: 100%;
 }
 
 .init-add-row {
