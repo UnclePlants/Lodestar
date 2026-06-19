@@ -3197,9 +3197,10 @@ function renderInitiativeOverlay() {
   const ov = controls.initiativeOverlay;
   if (!ov) return;
   const init = state.initiative;
-  // The overlay is independent of the docked panel: on the GM it shows when the GM overlay
-  // toggle is on and the panel is closed; on the player when the players toggle is on.
-  const show = init.combatants.length > 0 && (isPlayer ? init.showPlayers : init.showOverlay !== false && !init.active);
+  // The overlay is independent of the docked panel: it shows whenever its toggle is on
+  // (GM toggle on the GM screen, players toggle on the player display), so it persists when
+  // the panel is closed and the toggle has an immediate, visible effect when the panel is open.
+  const show = init.combatants.length > 0 && (isPlayer ? init.showPlayers : init.showOverlay !== false);
   ov.hidden = !show;
   if (!show) return;
   const list = sortedCombatants();
