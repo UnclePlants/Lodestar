@@ -1586,11 +1586,6 @@ input:disabled {
   gap: 14px;
 }
 
-.init-visibility .label {
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
 .initiative-overlay ol {
   display: flex;
   flex-direction: column;
