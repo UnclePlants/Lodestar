@@ -166,7 +166,7 @@ const controls = {
   initiativeOverlay: document.getElementById("initiativeOverlay"),
   initShowPlayers: document.getElementById("initShowPlayers"),
   initShowOverlay: document.getElementById("initShowOverlay"),
-  initClose: document.getElementById("initClose"),
+  initPanelToggle: document.getElementById("initPanelToggle"),
   initPrev: document.getElementById("initPrev"),
   initNext: document.getElementById("initNext"),
   initReset: document.getElementById("initReset"),
@@ -624,7 +624,7 @@ function bindControls() {
 
   // Initiative tracker
   controls.initToggle?.addEventListener("click", toggleInitiative);
-  controls.initClose?.addEventListener("click", () => setInitiativeActive(false));
+  controls.initPanelToggle?.addEventListener("click", toggleInitiative);
   controls.initPrev?.addEventListener("click", () => stepInitiative(-1));
   controls.initNext?.addEventListener("click", () => stepInitiative(1));
   controls.initReset?.addEventListener("click", resetInitiative);

@@ -256,6 +256,9 @@
         <button id="panelToggle" class="panel-toggle" type="button" title="Hide controls" aria-label="Collapse the control panel">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
         </button>
+        <button id="initPanelToggle" class="panel-toggle panel-toggle-right" type="button" title="Initiative tracker" aria-label="Show or hide the initiative tracker">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 17 5-5-5-5"/><path d="m6 17 5-5-5-5"/></svg>
+        </button>
         <p class="mode-hint-bar" id="modeHint">Drag to move the map. Wheel to zoom. Alt+click to ping.</p>
         <div class="stage-controls">
           <div class="tool-row">
@@ -468,9 +471,6 @@
       <aside class="initiative-panel" id="initiativePanel" aria-label="Initiative tracker">
         <div class="init-head">
           <h2>Initiative</h2>
-          <button id="initClose" class="init-close" type="button" title="Close tracker" aria-label="Close tracker">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-          </button>
         </div>
         <div class="init-visibility">
           <label class="switch with-label" title="Show the turn-order overlay on the GM screen (stays even when this panel is closed)">
