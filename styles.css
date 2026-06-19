@@ -1264,7 +1264,8 @@ input:disabled {
   min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 18px;
+  padding: 22px;
+  scrollbar-gutter: stable;
 }
 
 /* The player display never shows the GM's docked initiative panel. */
