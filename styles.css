@@ -639,8 +639,22 @@ input:disabled {
   width: 18px;
 }
 
-/* When the panel is collapsed, flip the chevrons to point "open". */
-.app-shell.panel-collapsed .panel-toggle svg {
+/* When the left panel is collapsed, flip the chevrons to point "open". */
+.app-shell.panel-collapsed .panel-toggle:not(.panel-toggle-right) svg {
+  transform: rotate(180deg);
+}
+
+/* Initiative panel retract tab: mirror of the left tab, on the right edge of the stage. */
+.panel-toggle-right {
+  border-left: 1px solid var(--line);
+  border-radius: 8px 0 0 8px;
+  border-right: 0;
+  left: auto;
+  right: 0;
+}
+
+/* Points "open" (left) while the initiative panel is closed; "closed" (right) when open. */
+.app-shell:not(.has-initiative) .panel-toggle-right svg {
   transform: rotate(180deg);
 }
 
@@ -1283,34 +1297,6 @@ input:disabled {
   flex: 1;
   font-size: 1rem;
   margin: 0;
-}
-
-.init-close {
-  align-items: center;
-  background: none;
-  border: 0;
-  color: var(--muted);
-  display: flex;
-  justify-content: center;
-  min-height: 0;
-  padding: 0;
-  width: 26px;
-}
-
-.init-close:hover {
-  background: none;
-  border: 0;
-  color: var(--text);
-}
-
-.init-close svg {
-  fill: none;
-  height: 18px;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-  width: 18px;
 }
 
 .init-round {
