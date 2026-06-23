@@ -99,6 +99,10 @@
               <input id="gridOpacity" type="range" min="0" max="1" step="0.05" value="0.45">
             </label>
           </div>
+          <label>
+            Line thickness
+            <input id="gridLineWidth" type="range" min="1" max="12" step="0.5" value="1">
+          </label>
           <label class="checkbox-row">
             <input id="gridSnap" type="checkbox" checked>
             <span>Snap tokens to grid</span>
@@ -153,6 +157,16 @@
             <label>
               Note size
               <input id="noteSize" type="range" min="0.5" max="4" step="0.1" value="1">
+            </label>
+          </div>
+          <div id="aoeMarkerSelPanel" class="hidden">
+            <label>
+              Area label (GM-only)
+              <input id="aoeMarkerLabel" type="text" placeholder="e.g. fire">
+            </label>
+            <label class="checkbox-row">
+              <input id="aoeMarkerShowPlayers" type="checkbox" checked>
+              <span>Show to players</span>
             </label>
           </div>
         </section>
@@ -352,7 +366,7 @@
           </div>
 
           <div class="tool-popover hidden" id="tokenOptions">
-            <h2>Token</h2>
+            <h2 id="tokenPanelHeading">Token</h2>
             <div class="inline-fields">
               <label>
                 Color
@@ -367,6 +381,16 @@
               Label
               <input id="tokenLabel" type="text" maxlength="3" placeholder="e.g. G1" autocomplete="off">
             </label>
+            <div id="tokenSelEdit" class="hidden">
+              <label>
+                Notes (GM only — shown on hover)
+                <textarea id="tokenNote" rows="2" placeholder="HP, conditions, secrets…" autocomplete="off"></textarea>
+              </label>
+              <label class="checkbox-row">
+                <input id="tokenHidden" type="checkbox">
+                <span>Hidden from players (stealth)</span>
+              </label>
+            </div>
             <div class="token-image-row">
               <img id="tokenImagePreview" class="token-image-preview hidden" alt="Token image preview">
               <label class="file-loader inline-loader token-image-loader">
@@ -379,7 +403,7 @@
               <input id="tokenBulk" type="file" accept="image/*" multiple>
               <span>Add image tokens (multi-select)…</span>
             </label>
-            <p class="hint">Click to drop, drag to move (a live distance shows while you drag), right-click to remove. In Move mode, click a token to select it, then nudge it cell by cell with the arrow keys. "Load image" re-skins the selected token or sets the art for new tokens; "Add image tokens" drops one token per selected file.</p>
+            <p class="hint">Click to drop, drag to move (a live distance shows while you drag), right-click to remove. In Move mode, click a token to select it — these fields then edit that token live (colour, size, label, notes, hide it from players). Nudge a selected token cell by cell with the arrow keys. "Load image" re-skins the selected token or sets the art for new tokens; "Add image tokens" drops one token per selected file.</p>
           </div>
 
           <div class="tool-popover hidden" id="aoeOptions">
@@ -410,7 +434,7 @@
               Color
               <input id="aoeColor" type="color" value="#e2603a">
             </label>
-            <p class="hint">Hover over the map to preview. Mouse wheel rotates the cone.</p>
+            <p class="hint">Hover to preview. Click to drop a persistent marker. Mouse wheel rotates the cone. Right-click a placed marker to remove it.</p>
           </div>
 
           <div class="tool-popover hidden" id="measureOptions">
