@@ -1597,7 +1597,7 @@ function sanitizedState() {
     clone.aoeMarkers = clone.aoeMarkers
       .filter((m) => m.showPlayers)
       // eslint-disable-next-line no-unused-vars
-      .map(({ label, showPlayers, ...rest }) => rest);
+      .map(({ label, ...rest }) => rest);
   }
   return clone;
 }
