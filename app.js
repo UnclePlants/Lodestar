@@ -1687,7 +1687,7 @@ function setMode(nextMode) {
     eraser: "Drag over fog to erase brush/bucket fog. Right-click a polygon to clear its area.",
     stamp: "Drag to draw a fog shape. Right-click an area to remove it.",
     token: "Click to drop a token, drag to move it, right-click to remove it.",
-    aoe: "Hover to preview. Click to drop a persistent AoE marker (grid-snapped, prompts for label). Right-click a marker to remove it. Double-click a marker to edit its label. Mouse wheel rotates the cone.",
+    aoe: "Hover to preview. Click to drop a persistent AoE marker (prompts for label). Right-click a marker to remove it. Double-click a marker to edit its label. Mouse wheel rotates the cone.",
     measure: "Drag to measure distance across the grid.",
     stair: "Click to place a staircase. Right-click a stair to remove it.",
   }[nextMode] ?? "";
@@ -2637,12 +2637,11 @@ function placeAoeMarker(native) {
   const label = window.prompt("Label for this area (GM-only, optional):", "");
   if (label === null) return; // cancelled
   pushHistory();
-  const pos = snapNative(native);
   const marker = {
     id: uuid(),
     shape: aoeShape,
-    x: pos.x,
-    y: pos.y,
+    x: native.x,
+    y: native.y,
     sizeFt: aoeSizeFt,
     angle: aoeAngle,
     color: aoeColor,
