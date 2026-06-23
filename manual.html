@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lodestar — Manual</title>
+<style>
+  :root {
+    --bg: #06021c;
+    --panel: #0d0930;
+    --panel-2: #161038;
+    --line: #2a2650;
+    --text: #e9e7f3;
+    --muted: #9a95b8;
+    --accent: #b1c301;
+    --accent-2: #7fb6a6;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 20px 120px;
+  }
+  .wrap { margin: 0 auto; max-width: 820px; }
+  header.book {
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 28px;
+    padding: 48px 0 24px;
+    text-align: center;
+  }
+  header.book h1 {
+    color: var(--accent);
+    font-family: Garamond, "EB Garamond", Georgia, serif;
+    font-size: 2.6rem;
+    letter-spacing: 0.06em;
+    margin: 0 0 6px;
+  }
+  header.book p { color: var(--muted); margin: 0; }
+  header.book a { color: var(--accent-2); }
+
+  nav.toc {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 40px;
+    padding: 18px 22px;
+  }
+  nav.toc h2 { font-size: 0.8rem; letter-spacing: 0.08em; margin: 0 0 10px; text-transform: uppercase; color: var(--muted); }
+  nav.toc ol { columns: 2; column-gap: 28px; margin: 0; padding-left: 18px; }
+  nav.toc li { margin: 3px 0; }
+  nav.toc a { color: var(--text); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+
+  section { margin-bottom: 48px; scroll-margin-top: 16px; }
+  h2.sec {
+    border-bottom: 1px solid var(--line);
+    color: var(--accent);
+    font-size: 1.5rem;
+    margin: 0 0 14px;
+    padding-bottom: 8px;
+  }
+  h3 { color: var(--accent-2); font-size: 1.05rem; margin: 24px 0 6px; }
+  p { margin: 10px 0; }
+  ul, ol { margin: 10px 0; padding-left: 22px; }
+  li { margin: 5px 0; }
+  a { color: var(--accent-2); }
+  strong { color: #fff; }
+  code, kbd {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    font-size: 0.9em;
+    padding: 1px 6px;
+  }
+  kbd { font-family: inherit; }
+
+  figure {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin: 20px 0;
+    overflow: hidden;
+    padding: 0;
+  }
+  figure img {
+    background: repeating-linear-gradient(45deg, #0c0930, #0c0930 14px, #100c38 14px, #100c38 28px);
+    display: block;
+    min-height: 90px;
+    width: 100%;
+  }
+  figcaption {
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.86rem;
+    padding: 9px 14px;
+  }
+  figcaption b { color: var(--accent); }
+
+  .callout {
+    background: var(--panel);
+    border-left: 3px solid var(--accent-2);
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+    padding: 12px 16px;
+  }
+  .callout.tip { border-left-color: var(--accent); }
+  .callout p { margin: 4px 0; }
+
+  table.keys { border-collapse: collapse; margin: 14px 0; width: 100%; }
+  table.keys td { border-bottom: 1px solid var(--line); padding: 7px 10px; vertical-align: top; }
+  table.keys td:first-child { white-space: nowrap; width: 1%; }
+
+  .top { color: var(--muted); font-size: 0.8rem; text-decoration: none; }
+  .top:hover { color: var(--accent); }
+  footer { border-top: 1px solid var(--line); color: var(--muted); margin-top: 56px; padding-top: 20px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="book">
+  <h1>LODESTAR</h1>
+  <p>User manual · <a href="index.html">Open the app</a> · <a href="https://lodestarvtt.com">lodestarvtt.com</a></p>
+</header>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#about">What Lodestar is</a></li>
+    <li><a href="#start">Getting started</a></li>
+    <li><a href="#cast">The player display</a></li>
+    <li><a href="#navigate">Moving around the map</a></li>
+    <li><a href="#grid">Grid &amp; calibration</a></li>
+    <li><a href="#fog">Fog of war</a></li>
+    <li><a href="#tokens">Tokens</a></li>
+    <li><a href="#images">Images &amp; notes</a></li>
+    <li><a href="#aoe">Area of effect</a></li>
+    <li><a href="#measure">Measure &amp; ping</a></li>
+    <li><a href="#initiative">Initiative tracker</a></li>
+    <li><a href="#rotate">Rotating &amp; the player frame</a></li>
+    <li><a href="#irl">In-person play on a TV</a></li>
+    <li><a href="#floors">Floors, stairs, splash</a></li>
+    <li><a href="#saving">Saving &amp; backups</a></li>
+    <li><a href="#keys">Keyboard shortcuts</a></li>
+    <li><a href="#tips">Tips &amp; troubleshooting</a></li>
+  </ol>
+</nav>
+
+<section id="about">
+  <h2 class="sec">What Lodestar is</h2>
+  <p><strong>Lodestar</strong> is a battlemap display tool for game masters. You run it from one browser window (the <strong>GM screen</strong>) and cast a second window (the <strong>player display</strong>) to a TV or second monitor. The GM sees everything; the players see only what you reveal.</p>
+  <p>Everything runs <strong>locally in your browser</strong> — no account, no cloud, nothing uploaded. Your maps live in your browser's storage on your own machine. It works fully offline once loaded.</p>
+  <figure>
+    <img src="screenshot.png" alt="The Lodestar GM screen with the control panel, top toolbar, and a fogged dungeon with named areas (left), casting to the player display (right).">
+    <figcaption><b>Figure 1.</b> Lodestar in use — the GM screen with the control panel, toolbar, and a fogged dungeon with named areas (left), casting to the player display (right).</figcaption>
+  </figure>
+</section>
+
+<section id="start">
+  <h2 class="sec">Getting started</h2>
+  <ol>
+    <li>Open Lodestar and click <strong>Enter</strong> on the welcome screen.</li>
+    <li>In the top of the left panel, click the <strong>Load map</strong> button (the image icon) and pick a map image from your computer.</li>
+    <li>The map appears. Use the mouse wheel to zoom and drag to pan. Press <kbd>F</kbd> (or click <strong>Fit</strong>) to frame the whole map.</li>
+  </ol>
+  <p>The left panel is organised into collapsible sections (Grid, View, Player View, Floors, Map library). Click a section title to open or close it. You can hide the whole panel with the tab on the left edge of the map to give the map more room.</p>
+  <figure>
+    <img src="manual/load-map.png" alt="Top of the left control panel showing the Load map, My maps, Save map and Open player display buttons.">
+    <figcaption><b>Figure 2.</b> The top action buttons: load a map, open saved maps, save, and open the player display.</figcaption>
+  </figure>
+</section>
+
+<section id="cast">
+  <h2 class="sec">The player display <a class="top" href="#about">↑ top</a></h2>
+  <p>Click <strong>Open player display</strong> (the monitor icon at the top of the panel). A second window opens — drag it onto your TV or second monitor and press <kbd>F</kbd> (or double-click) to make it fullscreen.</p>
+  <p>The player window shows the same map, but with fog as solid black and none of your GM-only tools. By default it follows your view; a <strong>red dashed rectangle</strong> on your GM screen shows exactly what the players are currently seeing.</p>
+  <ul>
+    <li><strong>Follow GM</strong> (Player View section): when on, the player screen mirrors your pan/zoom. Turn it off to frame the players' view independently.</li>
+    <li><strong>Match GM view</strong> snaps the player view to your current framing once.</li>
+    <li>You can drag the red frame itself to pan the players' view without moving your own (see <a href="#rotate">Rotating &amp; the player frame</a>).</li>
+  </ul>
+  <figure>
+    <img src="manual/player-display.png" alt="Side by side: the GM window with a red dashed frame on the left, and the player window showing the matching framed view on the right.">
+    <figcaption><b>Figure 3.</b> GM window (left) with the red player frame; the player window (right) shows exactly that region.</figcaption>
+  </figure>
+</section>
+
+<section id="navigate">
+  <h2 class="sec">Moving around the map <a class="top" href="#about">↑ top</a></h2>
+  <ul>
+    <li><strong>Pan:</strong> drag with the left mouse button in Move mode, or <strong>middle-mouse drag</strong> in any tool.</li>
+    <li><strong>Zoom:</strong> mouse wheel.</li>
+    <li><strong>Fit to screen:</strong> press <kbd>F</kbd> or click the fit button.</li>
+    <li><strong>Map image size</strong> (View section) scales the whole map up or down if your source image is very small or very large.</li>
+  </ul>
+</section>
+
+<section id="grid">
+  <h2 class="sec">Grid &amp; calibration <a class="top" href="#about">↑ top</a></h2>
+  <p>The <strong>Grid</strong> section toggles the square grid and adjusts its size, offset, colour, opacity, and token snapping.</p>
+  <h3>Calibrate to a map's own grid</h3>
+  <p>If your map already has a printed grid, you don't have to match it by hand. Click the small <strong>square-dashed</strong> button next to the size slider (it's also in the Measure tool), then <strong>drag a square over exactly one cell</strong> of the map. Lodestar sets the grid size <em>and</em> lines the grid up to that cell, so tokens snap onto the map's own squares — even with the grid overlay hidden. The ruler is calibrated at the same time.</p>
+  <figure>
+    <img src="manual/calibrate.png" alt="Dragging a dashed square over one printed cell of a battlemap to calibrate the grid.">
+    <figcaption><b>Figure 4.</b> Drag a square over one cell to calibrate the grid size and alignment in one step.</figcaption>
+  </figure>
+</section>
+
+<section id="fog">
+  <h2 class="sec">Fog of war <a class="top" href="#about">↑ top</a></h2>
+  <p>Click the <strong>fog</strong> tool in the toolbar to open the fog ribbon. Fog hides the map from players; you cover areas and clear them as the party explores. Tokens and images sit <em>under</em> the fog, so anything in a hidden area is concealed.</p>
+  <ul>
+    <li><strong>Fog area</strong> — click corners to trace a polygon, <kbd>Enter</kbd> to place. <strong>Named area</strong> adds a GM-only label.</li>
+    <li><strong>Fog shapes</strong> — drag to drop a rectangle, square, ellipse, circle, or triangle.</li>
+    <li><strong>Paint</strong> — brush fog on freehand (adjustable round/square brush; <kbd>[</kbd> / <kbd>]</kbd> resize it).</li>
+    <li><strong>Bucket</strong> — fill the entire map with fog at once.</li>
+    <li><strong>Erase</strong> — wipe brush/bucket fog away; you can paint back over an erased spot normally.</li>
+    <li><strong>Right-click a polygon area</strong> to remove it and clear the brush/bucket fog inside it (other polygon areas are left alone).</li>
+    <li><strong>Clear all fog</strong> empties everything.</li>
+  </ul>
+  <p>On your GM screen fog shows as an adjustable tint so you can still see through it; players see solid black.</p>
+  <figure>
+    <img src="manual/fog.png" alt="A battlemap with several fogged rooms, the GM seeing a translucent tint and the fog toolbar ribbon open.">
+    <figcaption><b>Figure 5.</b> Fogged areas (translucent for the GM) and the fog toolbar.</figcaption>
+  </figure>
+</section>
+
+<section id="tokens">
+  <h2 class="sec">Tokens <a class="top" href="#about">↑ top</a></h2>
+  <p>Select the <strong>Tokens</strong> tool. Click to drop a token, drag to move it, right-click to remove it. In the token options you can set a colour, a 1–4 cell size, a short label, or load a custom image.</p>
+  <p><strong>Bulk-add:</strong> use "Add image tokens" in the token options and multi-select several image files — Lodestar drops one token per image in a tidy grid for you to arrange.</p>
+  <p>In <strong>Move</strong> mode you can <strong>drag a token to move it</strong>, or click it once to select it. A selected token shows <strong>eight pop-out orientation arrows</strong> — click one to step a cell in that direction, including diagonals; the keyboard arrow keys nudge it too (<kbd>Delete</kbd> removes it). As you step it, Lodestar <strong>traces the actual path</strong> and shows the <strong>distance moved</strong>, counted with the D&amp;D 5e alternating-diagonal rule (every other diagonal costs an extra square). Dragging with the mouse shows the distance as well. Tokens snap to the grid and appear on both screens.</p>
+  <figure>
+    <img src="manual/tokens.png" alt="Several coloured and image tokens placed on a gridded map, with the token options popover open.">
+    <figcaption><b>Figure 6.</b> Tokens on the grid and the token options.</figcaption>
+  </figure>
+</section>
+
+<section id="images">
+  <h2 class="sec">Images &amp; notes <a class="top" href="#about">↑ top</a></h2>
+  <h3>Map images</h3>
+  <p>Drag an image file straight onto the map (or use <strong>Add image</strong> in the View section) to drop it as a movable picture — handy for handouts, props, or overlays. Select it to move, resize, or rotate it, and toggle whether players can see it (hidden from players by default). There's also a <strong>Snap images to grid</strong> option.</p>
+  <h3>Notes</h3>
+  <p><strong>Add note</strong> drops a GM-only sticky note on the map. Drag to move it, double-click to edit, <kbd>Delete</kbd> to remove, and resize it with the slider. Notes <em>never</em> appear on the player display.</p>
+  <figure>
+    <img src="manual/images-notes.png" alt="A map with a placed image prop and a yellow GM-only sticky note.">
+    <figcaption><b>Figure 7.</b> A placed image and a GM-only note.</figcaption>
+  </figure>
+</section>
+
+<section id="aoe">
+  <h2 class="sec">Area of effect <a class="top" href="#about">↑ top</a></h2>
+  <p>The <strong>Area of effect</strong> tool shows a live spell template that follows your cursor on both screens — a <strong>circle</strong>, <strong>cube/square</strong>, or <strong>cone</strong>. Pick the shape and a size in feet (presets or a custom value), and choose a colour. The cone rotates with the <strong>mouse wheel</strong> or the direction slider. It's a preview that follows the cursor, not something you place.</p>
+  <figure>
+    <img src="manual/aoe.png" alt="A translucent cone area-of-effect template projected from a point on the battlemap.">
+    <figcaption><b>Figure 8.</b> A cone area-of-effect template, mirrored to the players in real time.</figcaption>
+  </figure>
+</section>
+
+<section id="measure">
+  <h2 class="sec">Measure &amp; ping <a class="top" href="#about">↑ top</a></h2>
+  <ul>
+    <li><strong>Measure</strong> — drag to measure distance; it reports grid cells and your choice of feet or metres. (If the map has its own printed grid and the overlay is off, calibrate the ruler with the drag-a-square button.)</li>
+    <li><strong>Ping</strong> — hold <kbd>Alt</kbd> and click anywhere to drop an animated marker on both screens — great for "look here".</li>
+  </ul>
+</section>
+
+<section id="initiative">
+  <h2 class="sec">Initiative tracker <a class="top" href="#about">↑ top</a></h2>
+  <p>Open the initiative tracker from its toolbar button (the numbered-list icon) or the retract tab on the right edge of the map. Add players, NPCs, and monsters with an initiative score and HP. Advance turns and rounds with the arrows, track damage and healing with the HP bars, and click a name to set the current turn.</p>
+  <p>A compact <strong>order overlay</strong> can sit in the corner of the screen:</p>
+  <ul>
+    <li>The <strong>GM</strong> toggle shows it on your screen; the <strong>Players</strong> toggle mirrors it to the player display.</li>
+    <li>It stays visible even when the full panel is retracted, and has its own <strong>‹ / ›</strong> arrows to move through the round without reopening the panel.</li>
+  </ul>
+  <figure>
+    <img src="manual/initiative.png" alt="The docked initiative panel with several combatants and HP bars, plus the compact order overlay in the corner.">
+    <figcaption><b>Figure 9.</b> The initiative panel and the compact corner overlay.</figcaption>
+  </figure>
+</section>
+
+<section id="rotate">
+  <h2 class="sec">Rotating &amp; the player frame <a class="top" href="#about">↑ top</a></h2>
+  <h3>Rotate the map</h3>
+  <p>In the View section, the <strong>Rotate map</strong> arrows turn the whole battlemap in 90° steps — fog, tokens, and stairs all rotate with it, and the players follow. You can also <strong>rotate just the player view</strong> (Player View section) so the map reads right-side-up from across the table, without rotating your own screen.</p>
+  <h3>Drag the player frame to pan the TV</h3>
+  <p>The red dashed rectangle is what the players see. In Move mode you can <strong>grab it and drag it</strong> to pan the player display in real time — perfect for following the party around a large map without touching your own view.</p>
+  <figure>
+    <img src="manual/player-frame.png" alt="The GM dragging the red player-view frame across a large map to reposition what the players see.">
+    <figcaption><b>Figure 10.</b> Drag the red frame to move the players' view around the map.</figcaption>
+  </figure>
+</section>
+
+<section id="irl">
+  <h2 class="sec">In-person play on a TV <a class="top" href="#about">↑ top</a></h2>
+  <p>Lodestar is built for playing in person with a TV laid flat as the battlemap and physical miniatures on top. The player display becomes the tabletop; you drive it from your laptop.</p>
+  <ol>
+    <li>Open the player display and put it fullscreen on the TV.</li>
+    <li>Turn <strong>Follow GM</strong> off so the TV has its own framing.</li>
+    <li>Zoom the player view until one grid square on the TV matches the footprint of your minis.</li>
+    <li>Tick <strong>Lock square size on player screen (IRL TV)</strong> in the Player View section.</li>
+  </ol>
+  <p>From then on, the square stays that exact physical size <strong>across maps</strong>. Different maps have different resolutions, so when you load a new one you just <a href="#grid">calibrate its grid</a> (drag a square over one cell) and the player zoom adjusts itself automatically — your minis always match. The setting is remembered between sessions. Drag the red frame to slide the visible area around as the party moves.</p>
+  <figure>
+    <img src="manual/irl-tv.png" alt="A TV laid flat on a table showing a Lodestar map with physical miniatures standing on the grid squares.">
+    <figcaption><b>Figure 11 (optional).</b> A flat TV as the battlemap with physical minis on the locked-size grid.</figcaption>
+  </figure>
+</section>
+
+<section id="floors">
+  <h2 class="sec">Floors, stairs &amp; splash <a class="top" href="#about">↑ top</a></h2>
+  <ul>
+    <li><strong>Multi-floor:</strong> build multi-level locations — each floor has its own map, fog, tokens, and images. Use the ↑ / ↓ arrows in the map area to switch floors.</li>
+    <li><strong>Stairs:</strong> once you have at least two floors, place GM-only staircase markers that link them — click a stair to jump to the floor it leads to. Their colour is adjustable in the Floors section; players never see them.</li>
+    <li><strong>Splash / blackout:</strong> show a splash image or a plain black screen on the player display instead of the map — handy between scenes.</li>
+  </ul>
+</section>
+
+<section id="saving">
+  <h2 class="sec">Saving &amp; backups <a class="top" href="#about">↑ top</a></h2>
+  <p>Click <strong>Save map</strong> to store the whole setup (image, grid, fog, tokens, floors, views) in your browser's local library, and <strong>My maps</strong> to load one back.</p>
+  <div class="callout">
+    <p>Everything is stored in <strong>your browser on your computer</strong> — nothing is uploaded. Because of that, a saved library only appears in the same browser, on the same device, at the same address you saved it from. Clearing your browser's site data erases it.</p>
+  </div>
+  <p>For anything you want to keep or move between machines, use <strong>Export</strong> in the panel to save your whole library to a single JSON file, and <strong>Import</strong> it wherever you need it. That exported file is the one copy that doesn't depend on a browser setting — it's the safe way to back up.</p>
+</section>
+
+<section id="keys">
+  <h2 class="sec">Keyboard shortcuts <a class="top" href="#about">↑ top</a></h2>
+  <table class="keys">
+    <tr><td><kbd>V</kbd></td><td>Move / select</td></tr>
+    <tr><td><kbd>P</kbd> · <kbd>N</kbd></td><td>Polygon fog · Named fog area</td></tr>
+    <tr><td><kbd>B</kbd> · <kbd>E</kbd></td><td>Paint fog · Erase fog</td></tr>
+    <tr><td><kbd>T</kbd></td><td>Tokens</td></tr>
+    <tr><td><kbd>A</kbd></td><td>Area of effect</td></tr>
+    <tr><td><kbd>M</kbd></td><td>Measure</td></tr>
+    <tr><td><kbd>S</kbd></td><td>Stairs</td></tr>
+    <tr><td><kbd>F</kbd></td><td>Fit map to screen (and fullscreen on the player window)</td></tr>
+    <tr><td>Arrow keys</td><td>Pan the map (when no token is selected)</td></tr>
+    <tr><td><kbd>+</kbd> · <kbd>-</kbd></td><td>Zoom in · out</td></tr>
+    <tr><td><kbd>[</kbd> · <kbd>]</kbd></td><td>Brush size down · up</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Undo · Redo</td></tr>
+    <tr><td><kbd>Alt</kbd>+click</td><td>Ping</td></tr>
+    <tr><td>Middle-mouse drag</td><td>Pan in any tool</td></tr>
+    <tr><td>Right-click</td><td>Delete a token, fog area, image, note, or stair</td></tr>
+  </table>
+</section>
+
+<section id="tips">
+  <h2 class="sec">Tips &amp; troubleshooting <a class="top" href="#about">↑ top</a></h2>
+  <ul>
+    <li><strong>The player window must stay open</strong> for the red frame and casting to work. If it closes, just open it again.</li>
+    <li><strong>My saved maps disappeared.</strong> A library is tied to one browser, device, and address. Maps saved on the hosted site won't show in a downloaded copy (a different address), another browser, or a private window. Use Export/Import to move them.</li>
+    <li><strong>Big map images</strong> load and run fine locally, but very large files make the saved library and exports large. Resize enormous images first if backups feel heavy.</li>
+    <li><strong>Works offline.</strong> Once the page has loaded once, you can run a whole session with no internet.</li>
+  </ul>
+</section>
+
+<footer>
+  Lodestar · <a href="index.html">Open the app</a> · <a href="https://lodestarvtt.com">lodestarvtt.com</a>
+</footer>
+
+</div>
+</body>
+</html>

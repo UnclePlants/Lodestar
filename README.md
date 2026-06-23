@@ -30,7 +30,7 @@ A local-first battlemap display tool for game masters. Cast a map with fog of wa
 - **Multi-floor** — build multi-level locations; each floor has its own map, fog, tokens, and stairs. Navigate with the on-screen floor widget.
 - **Stairs** — place GM-only staircase arrows (color adjustable in the Floors section) that link floors; they scale with the grid and zoom and are invisible to players.
 - **Rotate** — rotate the GM map in 90° steps (fog, tokens, and stairs all ride along, and the player follows), or rotate just the player display independently so it reads right-side up from across the table.
-- **Tokens** — drop, drag, label, color, size, or give them a custom image; they snap to the grid and appear on both displays. In Move mode, click a token to select it and nudge it cell by cell with the arrow keys (Delete removes it).
+- **Tokens** — drop, drag, label, color, size, or give them a custom image; they snap to the grid and appear on both displays. Bulk-add tokens by multi-selecting image files (one token per image). In Move mode, click a token to select it (or drag to move it). A selected token gets 8 pop-out orientation arrows for stepping in any direction (including diagonals), and the arrow keys nudge it too; both trace the actual path and show the distance moved with the 5e alternating-diagonal rule. Dragging shows the distance as well. Delete removes a selected token.
 - **Map images** — drag an image file onto the map (or use *Add image* in View) to place it; move, resize, and rotate it, optionally snap it to the grid, and toggle per-image whether players can see it (hidden from players by default).
 - **Notes** — drop GM-only floating notes on the map from View; drag to move, double-click to edit, Delete to remove. Notes never appear on the player display.
 - **Grid** — toggle and adjust size, offset, color, opacity, and token snapping. Calibrate quickly by dragging a square over one cell: this sets the cell size *and* aligns the grid to that cell, so tokens snap onto a map's own printed grid even with the overlay off.
@@ -58,6 +58,7 @@ For anything you want to keep, use **Export** in the GM panel to save your whole
 
 - `V` move · `P` polygon fog · `N` named fog area · `B` brush · `E` eraser · `T` tokens · `A` area of effect · `M` measure · `S` stairs
 - `F` fit map · `[` / `]` brush size · `Ctrl+Z` undo · `Ctrl+Shift+Z` redo
+- Arrow keys pan the map · `+` / `-` zoom (when no token is selected)
 - **Middle-mouse drag** pans the map in any tool, so you never have to switch tools just to reposition.
 - Polygon mode: click corners, `Enter` to place, `Esc` to cancel. `Ctrl+Z` or `Backspace` removes just the last point you placed.
 - `Alt+click` anywhere to ping · right-click a token, fog area, or stair to delete it

@@ -72,6 +72,7 @@ const controls = {
   tokenCells: document.getElementById("tokenCells"),
   tokenLabel: document.getElementById("tokenLabel"),
   tokenImage: document.getElementById("tokenImage"),
+  tokenBulk: document.getElementById("tokenBulk"),
   tokenImagePreview: document.getElementById("tokenImagePreview"),
   tokenImageClear: document.getElementById("tokenImageClear"),
   panMode: document.getElementById("panMode"),
@@ -276,6 +277,8 @@ let isDragging = false;
 let dragStart = { x: 0, y: 0 };
 let viewStart = { cx: 0, cy: 0 };
 let draggingToken = null;
+let tokenDragMoved = false; // becomes true once a token drag actually moves (defers undo history)
+let tokenPath = null; // route a selected token has taken (cell points), for the path + distance readout
 let draggingImage = null;
 let draggingNote = null;
 let draggingFrame = false; // GM is dragging the player-view frame to pan the player display
@@ -587,6 +590,10 @@ function bindControls() {
   controls.stampTriangle?.addEventListener("click", () => setStampShape("triangle"));
   controls.tokenImage?.addEventListener("change", loadTokenImage);
   controls.tokenImageClear?.addEventListener("click", clearTokenImage);
+  controls.tokenBulk?.addEventListener("change", (event) => {
+    bulkAddTokenImages(event.target.files);
+    event.target.value = ""; // allow re-selecting the same files
+  });
   controls.measureUnit?.addEventListener("change", () => {
     state.measure.unit = controls.measureUnit.value === "metric" ? "metric" : "imperial";
     renderAndSync();
@@ -1631,6 +1638,7 @@ function setMode(nextMode) {
   stampDraft = null;
   selectedToken = null;
   selectedImage = selectedNote = null;
+  tokenPath = null;
   updateSelectionPanels();
   canvas.style.cursor = ""; // clear any frame-hover cursor
   controls.fogToggle?.classList.toggle("active", FOG_MODES.includes(nextMode));
@@ -1639,7 +1647,7 @@ function setMode(nextMode) {
   );
   controls[`${nextMode}Mode`]?.classList.add("active");
   controls.modeHint.textContent = {
-    pan: "Drag to move the map. Click a token to select it, then nudge it with the arrow keys. Middle-drag pans in any tool. Wheel to zoom. Alt+click to ping.",
+    pan: "Drag a token to move it, or drag the map to pan. Click a token to select it (then arrow keys nudge it). With nothing selected, arrow keys pan and +/− zoom. Middle-drag pans in any tool. Wheel to zoom. Alt+click to ping.",
     polygon: "Click corners, Enter to place. Ctrl+Z or Backspace removes the last point.",
     namedPolygon: "Click corners, Enter to place and name (GM-only label). Ctrl+Z removes the last point.",
     brush: "Drag to paint fog. Alt+click to ping.",
@@ -2095,6 +2103,7 @@ function render() {
   if (!isPlayer) drawStampDraft();
   if (!isPlayer) drawCalibrationDraft();
   if (measureLine) drawMeasureLine();
+  if (!isPlayer) drawTokenMovePath();
   if (!isPlayer && ["brush", "eraser"].includes(mode) && state.imageData) {
     drawToolPreview(screenToNative(clientToCanvasPoint(lastPointer)));
   }
@@ -2105,6 +2114,8 @@ function render() {
   // Screen-space overlays
   drawPings();
   if (measureLine) drawMeasureLabel();
+  if (!isPlayer) drawTokenMoveLabel();
+  if (!isPlayer && mode === "pan" && !draggingToken) drawOrientationArrows();
   if (!isPlayer) drawRoomNames();
   if (!isPlayer) drawNotes();
   if (!isPlayer) drawPlayerFrame();
@@ -2723,6 +2734,37 @@ function addToken(native) {
   renderAndSync();
 }
 
+// Drop one token per selected image file, laid out in a tidy grid centred on the GM view.
+function bulkAddTokenImages(files) {
+  const list = [...(files || [])].filter((f) => f.type.startsWith("image/"));
+  if (!list.length || !state.imageData) return;
+  pushHistory();
+  const cell = gridCellNative() || 70;
+  const cols = Math.ceil(Math.sqrt(list.length));
+  const rows = Math.ceil(list.length / cols);
+  const x0 = state.view.cx - ((cols - 1) * cell) / 2;
+  const y0 = state.view.cy - ((rows - 1) * cell) / 2;
+  const cells = Number(controls.tokenCells?.value) || 1;
+  const color = controls.tokenColor?.value || "#d6a94d";
+  let pending = list.length;
+  const done = () => {
+    if (--pending <= 0) renderAndSync();
+    else render();
+  };
+  list.forEach((file, i) => {
+    const pos = snapNative({ x: x0 + (i % cols) * cell, y: y0 + Math.floor(i / cols) * cell });
+    const reader = new FileReader();
+    reader.onerror = done;
+    reader.onload = () => {
+      downscaleImage(reader.result, TOKEN_IMAGE_MAX_EDGE, (data) => {
+        state.tokens.push({ id: uuid(), x: pos.x, y: pos.y, cells, color, label: "", image: data });
+        done();
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 // Token art is loaded once per data URL and cached; the image draws on every frame.
 function getTokenImage(src) {
   if (!src) return null;
@@ -2802,17 +2844,8 @@ function updateTokenImagePreview() {
 }
 
 function nudgeSelectedToken(key) {
-  if (!selectedToken) return;
-  const step = gridCellNative();
   const delta = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[key];
-  if (!delta) return;
-  pushHistory();
-  selectedToken.x += delta[0] * step;
-  selectedToken.y += delta[1] * step;
-  const snapped = snapNative(selectedToken);
-  selectedToken.x = snapped.x;
-  selectedToken.y = snapped.y;
-  renderAndSync();
+  if (delta) moveSelectedTokenByCell(delta[0], delta[1]);
 }
 
 /* ----------------------------- map images & notes ----------------------------- */
@@ -3275,21 +3308,156 @@ function drawPings() {
   ctx.restore();
 }
 
-function drawMeasureLine() {
+// Draw a dashed measure segment between two native points (called inside the map transform).
+function drawMeasureSegment(start, end) {
   ctx.save();
   ctx.strokeStyle = "rgba(214,169,77,0.95)";
   ctx.lineWidth = 2 / (curK * curMs);
   ctx.setLineDash([8 / (curK * curMs), 6 / (curK * curMs)]);
   ctx.beginPath();
-  ctx.moveTo(measureLine.start.x, measureLine.start.y);
-  ctx.lineTo(measureLine.end.x, measureLine.end.y);
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(end.x, end.y);
   ctx.stroke();
   ctx.setLineDash([]);
-  [measureLine.start, measureLine.end].forEach((p) => {
+  [start, end].forEach((p) => {
     ctx.beginPath();
     ctx.arc(p.x, p.y, 4 / (curK * curMs), 0, Math.PI * 2);
     ctx.fillStyle = "#d6a94d";
     ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawMeasureLine() {
+  drawMeasureSegment(measureLine.start, measureLine.end);
+}
+
+// Squares a movement path covers, using the D&D 5e "alternating" diagonal rule: every other
+// diagonal step costs 2. The diagonal counter runs across the whole path (it "repeats at the
+// beginning" as you keep going), and each segment is counted cell-by-cell so corners are exact.
+function pathSquares(path) {
+  const ms = state.map.scale || 1;
+  const cellW = measureCellWorld();
+  if (cellW <= 0 || !path || path.length < 2) return 0;
+  let diagCount = 0;
+  let squares = 0;
+  for (let i = 1; i < path.length; i++) {
+    const dx = Math.round((Math.abs(path[i].x - path[i - 1].x) * ms) / cellW);
+    const dy = Math.round((Math.abs(path[i].y - path[i - 1].y) * ms) / cellW);
+    const diag = Math.min(dx, dy);
+    squares += Math.abs(dx - dy); // orthogonal portion of the segment
+    for (let d = 0; d < diag; d++) {
+      diagCount++;
+      squares += diagCount % 2 === 1 ? 1 : 2;
+    }
+  }
+  return squares;
+}
+
+function moveDistanceLabel(squares) {
+  const unit = MEASURE_UNITS[state.measure.unit] || MEASURE_UNITS.imperial;
+  const dist = squares * unit.perCell;
+  const distStr = state.measure.unit === "metric" ? dist.toFixed(1) : String(Math.round(dist));
+  return `${squares} sq · ${distStr} ${unit.label}`;
+}
+
+// The path to display for the selected token: the committed cells, plus a live segment to the
+// current (snapped) cell while it's being mouse-dragged.
+function effectiveTokenPath() {
+  if (isPlayer || !selectedToken || !tokenPath) return null;
+  if (draggingToken === selectedToken && tokenDragMoved) {
+    const cur = snapNative({ x: selectedToken.x, y: selectedToken.y });
+    const last = tokenPath[tokenPath.length - 1];
+    if (cur.x !== last.x || cur.y !== last.y) return [...tokenPath, cur];
+  }
+  return tokenPath;
+}
+
+// Draw the route a selected token has travelled (GM only): a ghost ring at the start, the
+// dashed polyline through each waypoint, and dots at the corners.
+function drawTokenMovePath() {
+  const path = effectiveTokenPath();
+  if (!path || path.length < 2) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(path[0].x, path[0].y, tokenRadius(selectedToken), 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(214,169,77,0.5)";
+  ctx.lineWidth = 2 / (curK * curMs);
+  ctx.setLineDash([6 / (curK * curMs), 5 / (curK * curMs)]);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(path[0].x, path[0].y);
+  for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
+  ctx.strokeStyle = "rgba(214,169,77,0.95)";
+  ctx.lineWidth = 2 / (curK * curMs);
+  ctx.setLineDash([8 / (curK * curMs), 6 / (curK * curMs)]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  path.forEach((p) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3.5 / (curK * curMs), 0, Math.PI * 2);
+    ctx.fillStyle = "#d6a94d";
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
+// Eight-way orientation movers around the selected token. Drawn at a constant screen distance
+// in each grid direction (so they follow the map's rotation), and clicked to step one cell.
+const ORIENTATION_DIRS = [
+  { dx: 0, dy: -1 }, { dx: 1, dy: -1 }, { dx: 1, dy: 0 }, { dx: 1, dy: 1 },
+  { dx: 0, dy: 1 }, { dx: -1, dy: 1 }, { dx: -1, dy: 0 }, { dx: -1, dy: -1 },
+];
+
+function orientationArrowPositions() {
+  if (!selectedToken) return [];
+  const cell = gridCellNative() || 70;
+  const base = nativeToScreen({ x: selectedToken.x, y: selectedToken.y });
+  const radius = tokenRadius(selectedToken) * curK * curMs + 24;
+  return ORIENTATION_DIRS.map(({ dx, dy }) => {
+    const off = nativeToScreen({ x: selectedToken.x + dx * cell, y: selectedToken.y + dy * cell });
+    let sx = off.x - base.x;
+    let sy = off.y - base.y;
+    const len = Math.hypot(sx, sy) || 1;
+    sx /= len;
+    sy /= len;
+    return { dx, dy, sx, sy, x: base.x + sx * radius, y: base.y + sy * radius };
+  });
+}
+
+function hitOrientationArrow(screenPt) {
+  if (!selectedToken) return null;
+  for (const a of orientationArrowPositions()) {
+    if (Math.hypot(screenPt.x - a.x, screenPt.y - a.y) <= 14) return a;
+  }
+  return null;
+}
+
+function drawOrientationArrows() {
+  const arrows = orientationArrowPositions();
+  if (!arrows.length) return;
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  arrows.forEach((a) => {
+    ctx.beginPath();
+    ctx.arc(a.x, a.y, 11, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(12,13,13,0.82)";
+    ctx.fill();
+    ctx.strokeStyle = "#b1c301";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    ctx.rotate(Math.atan2(a.sy, a.sx));
+    ctx.beginPath();
+    ctx.moveTo(-3, -4);
+    ctx.lineTo(4, 0);
+    ctx.lineTo(-3, 4);
+    ctx.strokeStyle = "#c6fff1";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
   });
   ctx.restore();
 }
@@ -3302,21 +3470,21 @@ function measureCellWorld() {
   return state.grid.size > 0 ? state.grid.size : 0;
 }
 
-function drawMeasureLabel() {
+function measureLabelText(start, end) {
   const ms = state.map.scale || 1;
-  const dx = (measureLine.end.x - measureLine.start.x) * ms;
-  const dy = (measureLine.end.y - measureLine.start.y) * ms;
-  const worldDist = Math.hypot(dx, dy);
+  const worldDist = Math.hypot((end.x - start.x) * ms, (end.y - start.y) * ms);
   const cellW = measureCellWorld();
   const cells = cellW > 0 ? worldDist / cellW : 0;
   const unit = MEASURE_UNITS[state.measure.unit] || MEASURE_UNITS.imperial;
   const dist = cells * unit.perCell;
   const distStr = state.measure.unit === "metric" ? dist.toFixed(1) : String(Math.round(dist));
-  const label = `${cells.toFixed(1)} cells · ${distStr} ${unit.label}`;
-  const mid = nativeToScreen({
-    x: (measureLine.start.x + measureLine.end.x) / 2,
-    y: (measureLine.start.y + measureLine.end.y) / 2,
-  });
+  return `${cells.toFixed(1)} cells · ${distStr} ${unit.label}`;
+}
+
+// Screen-space distance label centred on a native segment (called after the map transform).
+function drawMeasureLabelAt(start, end, labelOverride) {
+  const label = labelOverride || measureLabelText(start, end);
+  const mid = nativeToScreen({ x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 });
   ctx.save();
   ctx.font = "600 13px Inter, sans-serif";
   ctx.textAlign = "center";
@@ -3328,6 +3496,55 @@ function drawMeasureLabel() {
   ctx.fillStyle = "#f4e8c8";
   ctx.fillText(label, mid.x, mid.y - 14);
   ctx.restore();
+}
+
+function drawMeasureLabel() {
+  drawMeasureLabelAt(measureLine.start, measureLine.end);
+}
+
+function drawTokenMoveLabel() {
+  const path = effectiveTokenPath();
+  if (!path || path.length < 2) return;
+  const label = moveDistanceLabel(pathSquares(path));
+  const end = path[path.length - 1];
+  const s = nativeToScreen(end);
+  // Sit clearly above the orientation-arrow ring (token radius + arrow offset + arrow size)
+  // so the arrows never cover the readout.
+  const yOff = -(tokenRadius(selectedToken) * curK * curMs + 50);
+  ctx.save();
+  ctx.font = "600 13px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const width = ctx.measureText(label).width + 12;
+  ctx.fillStyle = "rgba(12,13,13,0.85)";
+  ctx.fillRect(s.x - width / 2, s.y + yOff - 10, width, 20);
+  ctx.fillStyle = "#f4e8c8";
+  ctx.fillText(label, s.x, s.y + yOff);
+  ctx.restore();
+}
+
+function appendTokenPath(cell) {
+  if (!tokenPath) {
+    tokenPath = [{ x: cell.x, y: cell.y }];
+    return;
+  }
+  const last = tokenPath[tokenPath.length - 1];
+  if (cell.x !== last.x || cell.y !== last.y) tokenPath.push({ x: cell.x, y: cell.y });
+}
+
+// Step the selected token one cell in a grid direction (orientation arrows / arrow keys),
+// recording the move in its path.
+function moveSelectedTokenByCell(dx, dy) {
+  if (!selectedToken) return;
+  const cell = gridCellNative();
+  pushHistory();
+  selectedToken.x += dx * cell;
+  selectedToken.y += dy * cell;
+  const snapped = snapNative(selectedToken);
+  selectedToken.x = snapped.x;
+  selectedToken.y = snapped.y;
+  appendTokenPath(snapped);
+  renderAndSync();
 }
 
 /* ----------------------------- pointer input ----------------------------- */
@@ -3388,8 +3605,8 @@ function onPointerDown(event) {
   if (mode === "token") {
     const hit = hitToken(native);
     if (hit) {
-      pushHistory();
       draggingToken = hit;
+      tokenDragMoved = false;
       isDragging = true;
       capturePointer(event.pointerId);
     } else {
@@ -3407,14 +3624,31 @@ function onPointerDown(event) {
     return;
   }
 
-  // In Move mode: click a token to select it (for arrow-key nudging), a note or image to
+  // In Move mode: click a token to select it and drag to move it, a note or image to
   // select+drag it, or a stair to jump floors. Clicking empty space clears selection and pans.
   if (mode === "pan") {
+    // Clicking an orientation arrow steps the selected token one cell that way.
+    if (selectedToken) {
+      const arrow = hitOrientationArrow(clientToCanvasPoint(event));
+      if (arrow) {
+        moveSelectedTokenByCell(arrow.dx, arrow.dy);
+        return;
+      }
+    }
     const token = hitToken(native);
     if (token) {
-      selectedToken = token;
+      // Selecting a different token starts a fresh movement path; re-grabbing the same one
+      // (e.g. to drag it) keeps the path it already has.
+      if (selectedToken !== token) {
+        selectedToken = token;
+        tokenPath = [{ x: token.x, y: token.y }];
+      }
       selectedImage = selectedNote = null;
       updateSelectionPanels();
+      draggingToken = token;
+      tokenDragMoved = false;
+      isDragging = true;
+      capturePointer(event.pointerId);
       render();
       return;
     }
@@ -3458,6 +3692,7 @@ function onPointerDown(event) {
     }
     if (selectedToken || selectedImage || selectedNote) {
       selectedToken = selectedImage = selectedNote = null;
+      tokenPath = null;
       updateSelectionPanels();
       render();
     }
@@ -3549,6 +3784,10 @@ function onPointerMove(event) {
   }
 
   if (draggingToken) {
+    if (!tokenDragMoved) {
+      pushHistory(); // first movement of this drag — record one undo step
+      tokenDragMoved = true;
+    }
     const native = toNativePoint(event);
     draggingToken.x = native.x;
     draggingToken.y = native.y;
@@ -3630,11 +3869,16 @@ function onPointerUp(event) {
   }
 
   if (draggingToken) {
-    const snapped = snapNative({ x: draggingToken.x, y: draggingToken.y });
-    draggingToken.x = snapped.x;
-    draggingToken.y = snapped.y;
+    if (tokenDragMoved) {
+      const snapped = snapNative({ x: draggingToken.x, y: draggingToken.y });
+      draggingToken.x = snapped.x;
+      draggingToken.y = snapped.y;
+      // A mouse move adds a waypoint to the selected token's path (so the readout continues).
+      if (selectedToken === draggingToken) appendTokenPath(snapped);
+      renderAndSync();
+    }
     draggingToken = null;
-    renderAndSync();
+    tokenDragMoved = false;
   }
 
   if (draggingImage) {
@@ -3788,6 +4032,7 @@ function onKeyDown(event) {
     pushHistory();
     state.tokens = state.tokens.filter((t) => t !== selectedToken);
     selectedToken = null;
+    tokenPath = null;
     renderAndSync();
     return;
   }
@@ -3820,6 +4065,26 @@ function onKeyDown(event) {
     return;
   }
 
+  // Pan the map with the arrow keys when nothing is selected (handy on a trackpad).
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+    event.preventDefault();
+    const step = 90;
+    const delta = { ArrowUp: [0, -step], ArrowDown: [0, step], ArrowLeft: [-step, 0], ArrowRight: [step, 0] }[event.key];
+    nudgeView(delta[0], delta[1]);
+    return;
+  }
+  // Zoom with + / - (and = / _), about the centre of the view.
+  if (event.key === "+" || event.key === "=") {
+    event.preventDefault();
+    zoomView(1.12);
+    return;
+  }
+  if (event.key === "-" || event.key === "_") {
+    event.preventDefault();
+    zoomView(1 / 1.12);
+    return;
+  }
+
   const shortcuts = { v: "pan", h: "pan", p: "polygon", n: "namedPolygon", b: "brush", e: "eraser", t: "token", a: "aoe", m: "measure", s: "stair" };
   const key = event.key.toLowerCase();
   if (shortcuts[key]) {
@@ -3829,6 +4094,34 @@ function onKeyDown(event) {
   if (key === "f") fitMap(true);
   if (key === "[") adjustBrush(-10);
   if (key === "]") adjustBrush(10);
+}
+
+// Keyboard pan/zoom (trackpad-friendly). Pan nudges the view by a screen-space step
+// (rotation-aware); zoom keeps the view centre fixed.
+function nudgeView(dxScreen, dyScreen) {
+  if (!state.imageData) return;
+  const t = viewTransform();
+  const s = t.k * t.ms;
+  const cos = Math.cos(-t.rot);
+  const sin = Math.sin(-t.rot);
+  state.view.cx += (dxScreen * cos - dyScreen * sin) / s;
+  state.view.cy += (dxScreen * sin + dyScreen * cos) / s;
+  if (state.playerView.matchDM) {
+    state.playerView.cx = state.view.cx;
+    state.playerView.cy = state.view.cy;
+    syncPlayerViewControls();
+  }
+  renderAndSyncView();
+}
+
+function zoomView(factor) {
+  if (!state.imageData) return;
+  state.view.scale = Math.min(16, Math.max(0.02, state.view.scale * factor));
+  if (state.playerView.matchDM) {
+    state.playerView.scale = state.view.scale;
+    syncPlayerViewControls();
+  }
+  renderAndSyncView();
 }
 
 function adjustBrush(delta) {
