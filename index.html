@@ -22,7 +22,10 @@
           </g>
         </svg>
         <p class="start-tagline">A battlemap display tool for game masters.</p>
-        <button id="startEnter" class="start-enter" type="button">Enter</button>
+        <div class="start-actions">
+          <button id="startEnter" class="start-enter" type="button">Enter</button>
+          <a class="start-manual" href="manual.html" target="_blank" rel="noopener">Manual</a>
+        </div>
       </div>
       <p class="start-credit">made by u/UnclePlants</p>
     </div>
@@ -372,7 +375,11 @@
               </label>
               <button id="tokenImageClear" class="hidden" type="button">Clear</button>
             </div>
-            <p class="hint">Click to drop, drag to move, right-click to remove. In Move mode, click a token to select it, then use the arrow keys to nudge it cell by cell. Loading an image re-skins the selected token, or sets the art for new tokens.</p>
+            <label class="file-loader inline-loader">
+              <input id="tokenBulk" type="file" accept="image/*" multiple>
+              <span>Add image tokens (multi-select)…</span>
+            </label>
+            <p class="hint">Click to drop, drag to move (a live distance shows while you drag), right-click to remove. In Move mode, click a token to select it, then nudge it cell by cell with the arrow keys. "Load image" re-skins the selected token or sets the art for new tokens; "Add image tokens" drops one token per selected file.</p>
           </div>
 
           <div class="tool-popover hidden" id="aoeOptions">

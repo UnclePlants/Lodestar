@@ -91,6 +91,13 @@ button:hover {
   margin: 0;
 }
 
+.start-actions {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .start-enter {
   animation: start-rise 0.7s ease 0.55s both;
   background: var(--accent);
@@ -107,6 +114,25 @@ button:hover {
 .start-enter:hover {
   border-color: transparent;
   filter: brightness(1.08);
+}
+
+.start-manual {
+  align-items: center;
+  animation: start-rise 0.7s ease 0.7s both;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  min-height: 44px;
+  padding: 0 36px;
+  text-decoration: none;
+}
+
+.start-manual:hover {
+  border-color: var(--accent-2);
+  color: var(--text);
 }
 
 .start-credit {
