@@ -64,6 +64,7 @@ const controls = {
   gridOffsetY: document.getElementById("gridOffsetY"),
   gridColor: document.getElementById("gridColor"),
   gridOpacity: document.getElementById("gridOpacity"),
+  gridLineWidth: document.getElementById("gridLineWidth"),
   mapScale: document.getElementById("mapScale"),
   brushSize: document.getElementById("brushSize"),
   fogTint: document.getElementById("fogTint"),
@@ -71,6 +72,10 @@ const controls = {
   tokenColor: document.getElementById("tokenColor"),
   tokenCells: document.getElementById("tokenCells"),
   tokenLabel: document.getElementById("tokenLabel"),
+  tokenNote: document.getElementById("tokenNote"),
+  tokenHidden: document.getElementById("tokenHidden"),
+  tokenSelEdit: document.getElementById("tokenSelEdit"),
+  tokenPanelHeading: document.getElementById("tokenPanelHeading"),
   tokenImage: document.getElementById("tokenImage"),
   tokenBulk: document.getElementById("tokenBulk"),
   tokenImagePreview: document.getElementById("tokenImagePreview"),
@@ -136,6 +141,9 @@ const controls = {
   imageRotation: document.getElementById("imageRotation"),
   noteSelPanel: document.getElementById("noteSelPanel"),
   noteSize: document.getElementById("noteSize"),
+  aoeMarkerSelPanel: document.getElementById("aoeMarkerSelPanel"),
+  aoeMarkerLabel: document.getElementById("aoeMarkerLabel"),
+  aoeMarkerShowPlayers: document.getElementById("aoeMarkerShowPlayers"),
   playerFrameColor: document.getElementById("playerFrameColor"),
   playerFrameOpacity: document.getElementById("playerFrameOpacity"),
   panelToggle: document.getElementById("panelToggle"),
@@ -203,6 +211,7 @@ function makeFloor(id) {
     stairs: [],
     images: [],
     notes: [],
+    aoeMarkers: [],
     view: { scale: 1, cx: 0, cy: 0, rotation: 0 },
   };
 }
@@ -215,7 +224,7 @@ const state = {
   imageHeight: 0,
   splash: { enabled: false, imageData: "", imageName: "" },
   blackout: false,
-  grid: { enabled: true, snap: true, snapImages: false, size: 70, offsetX: 0, offsetY: 0, color: "#000000", opacity: 0.45 },
+  grid: { enabled: true, snap: true, snapImages: false, size: 70, offsetX: 0, offsetY: 0, color: "#000000", opacity: 0.45, lineWidth: 1 },
   map: { scale: 1 },
   fog: {
     rooms: [],
@@ -232,6 +241,7 @@ const state = {
   // GM-only floating notes (never synced). Both are per-floor like tokens/stairs.
   images: [],
   notes: [],
+  aoeMarkers: [], // persistent AoE regions; shapes/positions synced to players, labels are GM-only
   stairColor: "#ffffff", // GM-only stair marker color (stairs never show on the player display)
   // Initiative tracker: a turn order shared across all floors. When showPlayers is on, a
   // compact order overlay is mirrored to the player display.
@@ -270,6 +280,7 @@ const AOE_CONE_HALF_ANGLE = Math.atan(0.5); // ~26.6°, total spread ≈ 53° (D
 let selectedToken = null; // token highlighted in Move mode for arrow-key nudging (GM only)
 let selectedImage = null; // map image selected in Move mode (GM only)
 let selectedNote = null; // floating note selected in Move mode (GM only)
+let selectedAoeMarker = null; // persistent AoE marker selected in Move mode (GM only)
 let tokenImageData = ""; // image applied to newly placed tokens (data URL), authoring default
 const tokenImageCache = new Map(); // data URL -> HTMLImageElement, so token art draws each frame
 const IMAGE_MAX_EDGE = 1024; // cap dropped map images so saves/syncs stay bounded
@@ -528,6 +539,7 @@ function bindControls() {
     ["gridOffsetY", "offsetY", "value"],
     ["gridColor", "color", "value"],
     ["gridOpacity", "opacity", "value"],
+    ["gridLineWidth", "lineWidth", "value"],
   ];
   gridBindings.forEach(([controlName, stateKey, prop]) => {
     controls[controlName].addEventListener("input", () => {
@@ -750,6 +762,16 @@ function bindControls() {
     if (!selectedNote) return;
     selectedNote.scale = Number(controls.noteSize.value);
     render(); // notes are GM-only
+  });
+  controls.aoeMarkerLabel?.addEventListener("input", () => {
+    if (!selectedAoeMarker) return;
+    selectedAoeMarker.label = controls.aoeMarkerLabel.value;
+    render();
+  });
+  controls.aoeMarkerShowPlayers?.addEventListener("change", () => {
+    if (!selectedAoeMarker) return;
+    selectedAoeMarker.showPlayers = controls.aoeMarkerShowPlayers.checked;
+    renderAndSync();
   });
   controls.copyDMView.addEventListener("click", () => snapPlayerViewToGM(true));
   controls.playerZoom.addEventListener("input", () => {
@@ -1154,6 +1176,7 @@ function loadSnapshot(snapshot) {
     state.stairs = Array.isArray(snapshot.stairs) ? snapshot.stairs : [];
     state.images = Array.isArray(snapshot.images) ? snapshot.images : [];
     state.notes = []; // notes are GM-only and never arrive on the player
+    state.aoeMarkers = Array.isArray(snapshot.aoeMarkers) ? snapshot.aoeMarkers : [];
     Object.assign(state.view, snapshot.view || {});
     state.imageId = snapshot.imageId || state.imageId;
     state.imageData = snapshot.imageData || state.imageData; // keep the image assets delivered separately
@@ -1245,6 +1268,7 @@ function syncControlsFromState() {
   controls.gridOffsetY.value = state.grid.offsetY;
   controls.gridColor.value = state.grid.color;
   controls.gridOpacity.value = state.grid.opacity;
+  if (controls.gridLineWidth) controls.gridLineWidth.value = state.grid.lineWidth ?? 1;
   controls.splashEnabled.checked = state.splash.enabled;
   controls.blackoutEnabled.checked = state.blackout;
   controls.mapScale.value = state.map.scale;
@@ -1312,6 +1336,7 @@ function captureCurrentFloor() {
   floor.stairs = JSON.parse(JSON.stringify(state.stairs));
   floor.images = JSON.parse(JSON.stringify(state.images));
   floor.notes = JSON.parse(JSON.stringify(state.notes));
+  floor.aoeMarkers = JSON.parse(JSON.stringify(state.aoeMarkers));
   floor.view = { ...state.view };
 }
 
@@ -1331,6 +1356,7 @@ function applyFloor(floor) {
   state.stairs = JSON.parse(JSON.stringify(floor.stairs || []));
   state.images = JSON.parse(JSON.stringify(floor.images || []));
   state.notes = JSON.parse(JSON.stringify(floor.notes || []));
+  state.aoeMarkers = JSON.parse(JSON.stringify(floor.aoeMarkers || []));
   Object.assign(state.view, floor.view || { scale: 1, cx: 0, cy: 0 });
   state.view.rotation = floor.view?.rotation || 0; // default older floors with no rotation
   fogDirty = true;
@@ -1566,6 +1592,13 @@ function sanitizedState() {
   const clone = JSON.parse(JSON.stringify(rest));
   if (clone.splash) delete clone.splash.imageData;
   delete clone.notes; // floating notes are GM-only and never leave the GM window
+  // Send only player-visible markers; strip GM-only label field.
+  if (clone.aoeMarkers) {
+    clone.aoeMarkers = clone.aoeMarkers
+      .filter((m) => m.showPlayers)
+      // eslint-disable-next-line no-unused-vars
+      .map(({ label, showPlayers, ...rest }) => rest);
+  }
   return clone;
 }
 
@@ -1637,7 +1670,7 @@ function setMode(nextMode) {
   drawingRoom = [];
   stampDraft = null;
   selectedToken = null;
-  selectedImage = selectedNote = null;
+  selectedImage = selectedNote = selectedAoeMarker = null;
   tokenPath = null;
   updateSelectionPanels();
   canvas.style.cursor = ""; // clear any frame-hover cursor
@@ -1654,7 +1687,7 @@ function setMode(nextMode) {
     eraser: "Drag over fog to erase brush/bucket fog. Right-click a polygon to clear its area.",
     stamp: "Drag to draw a fog shape. Right-click an area to remove it.",
     token: "Click to drop a token, drag to move it, right-click to remove it.",
-    aoe: "Hover over the map to preview the area of effect. Mouse wheel rotates the cone.",
+    aoe: "Hover to preview. Click to drop a persistent AoE marker (grid-snapped, prompts for label). Right-click a marker to remove it. Double-click a marker to edit its label. Mouse wheel rotates the cone.",
     measure: "Drag to measure distance across the grid.",
     stair: "Click to place a staircase. Right-click a stair to remove it.",
   }[nextMode] ?? "";
@@ -1725,7 +1758,7 @@ function fillAllFog() {
 /* ----------------------------- history ----------------------------- */
 
 function snapshotFog() {
-  return JSON.stringify({ rooms: state.fog.rooms, strokes: state.fog.strokes, tokens: state.tokens, stairs: state.stairs, images: state.images, notes: state.notes });
+  return JSON.stringify({ rooms: state.fog.rooms, strokes: state.fog.strokes, tokens: state.tokens, stairs: state.stairs, images: state.images, notes: state.notes, aoeMarkers: state.aoeMarkers });
 }
 function pushHistory() {
   undoStack.push(snapshotFog());
@@ -1741,7 +1774,8 @@ function applyFogSnapshot(serialized) {
   state.stairs = data.stairs || [];
   state.images = data.images || [];
   state.notes = data.notes || [];
-  selectedImage = selectedNote = null;
+  state.aoeMarkers = data.aoeMarkers || [];
+  selectedImage = selectedNote = selectedAoeMarker = null;
   fogDirty = true;
 }
 function undo() {
@@ -2096,6 +2130,7 @@ function render() {
   drawImages();
   drawTokens();
   compositeFog();
+  drawAoeMarkers(); // persistent AoE regions (above fog, below hover template)
   drawAoeTemplate(); // hover template sits above fog; visible to both GM and player
   if (!isPlayer) drawRoomOutlines();
   if (!isPlayer) drawStairs(); // stairs are a GM-only navigation aid stays above fog
@@ -2118,6 +2153,7 @@ function render() {
   if (!isPlayer && mode === "pan" && !draggingToken) drawOrientationArrows();
   if (!isPlayer) drawRoomNames();
   if (!isPlayer) drawNotes();
+  if (!isPlayer) drawAoeMarkerLabels();
   if (!isPlayer) drawPlayerFrame();
 }
 
@@ -2184,7 +2220,7 @@ function drawGrid(worldW, worldH) {
   ctx.save();
   ctx.globalAlpha = state.grid.opacity;
   ctx.strokeStyle = state.grid.color;
-  ctx.lineWidth = 1 / curK;
+  ctx.lineWidth = (state.grid.lineWidth || 1) / curK;
   ctx.beginPath();
   const startX = ((state.grid.offsetX % size) + size) % size;
   const startY = ((state.grid.offsetY % size) + size) % size;
@@ -2563,6 +2599,136 @@ function setAoeShape(shape) {
   ].forEach(([name, btn]) => btn?.classList.toggle("active", shape === name));
   updateAoePresets();
   controls.aoeAngleRow?.classList.toggle("hidden", shape !== "cone");
+}
+
+// Size in native px for a placed AoE marker (radius, half-side, or cone length).
+function aoePxSize(m) {
+  return m.sizeFt * measureCellWorld() / FEET_PER_CELL / (state.map.scale || 1);
+}
+
+// Hit-test a native point against all placed AoE markers (reverse order = top first).
+function hitAoeMarker(native) {
+  const list = state.aoeMarkers || [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const m = list[i];
+    const size = aoePxSize(m);
+    const dx = native.x - m.x;
+    const dy = native.y - m.y;
+    if (m.shape === "circle") {
+      if (Math.hypot(dx, dy) <= size) return m;
+    } else if (m.shape === "square") {
+      if (Math.abs(dx) <= size / 2 && Math.abs(dy) <= size / 2) return m;
+    } else if (m.shape === "cone") {
+      const a1 = m.angle - AOE_CONE_HALF_ANGLE;
+      const a2 = m.angle + AOE_CONE_HALF_ANGLE;
+      const pts = [
+        { x: m.x, y: m.y },
+        { x: m.x + Math.cos(a1) * size, y: m.y + Math.sin(a1) * size },
+        { x: m.x + Math.cos(a2) * size, y: m.y + Math.sin(a2) * size },
+      ];
+      if (pointInPolygon(native, pts)) return m;
+    }
+  }
+  return null;
+}
+
+// Drop the current AoE template as a persistent marker at native point (grid-snapped).
+function placeAoeMarker(native) {
+  const label = window.prompt("Label for this area (GM-only, optional):", "");
+  if (label === null) return; // cancelled
+  pushHistory();
+  const pos = snapNative(native);
+  const marker = {
+    id: uuid(),
+    shape: aoeShape,
+    x: pos.x,
+    y: pos.y,
+    sizeFt: aoeSizeFt,
+    angle: aoeAngle,
+    color: aoeColor,
+    label: label.trim(),
+    showPlayers: true,
+  };
+  state.aoeMarkers.push(marker);
+  renderAndSync();
+}
+
+function editAoeMarkerLabel(marker) {
+  const text = window.prompt("Edit label (GM-only, optional):", marker.label || "");
+  if (text === null) return;
+  pushHistory();
+  marker.label = text.trim();
+  render();
+}
+
+// Draw all persistent AoE markers in native coords (called inside the map transform).
+function drawAoeMarkers() {
+  const list = state.aoeMarkers || [];
+  if (!list.length) return;
+  list.forEach((m) => {
+    if (isPlayer && !m.showPlayers) return;
+    const size = aoePxSize(m);
+    ctx.save();
+    ctx.beginPath();
+    if (m.shape === "circle") {
+      ctx.arc(m.x, m.y, size, 0, Math.PI * 2);
+    } else if (m.shape === "square") {
+      ctx.rect(m.x - size / 2, m.y - size / 2, size, size);
+    } else if (m.shape === "cone") {
+      const a1 = m.angle - AOE_CONE_HALF_ANGLE;
+      const a2 = m.angle + AOE_CONE_HALF_ANGLE;
+      ctx.moveTo(m.x, m.y);
+      ctx.lineTo(m.x + Math.cos(a1) * size, m.y + Math.sin(a1) * size);
+      ctx.lineTo(m.x + Math.cos(a2) * size, m.y + Math.sin(a2) * size);
+      ctx.closePath();
+    }
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = m.color;
+    ctx.fill();
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = 2 / (curK * curMs);
+    ctx.strokeStyle = m.color;
+    ctx.stroke();
+    if (!isPlayer && m === selectedAoeMarker) {
+      ctx.globalAlpha = 0.6;
+      ctx.lineWidth = 3 / (curK * curMs);
+      ctx.strokeStyle = "#b1c301";
+      ctx.setLineDash([8 / (curK * curMs), 5 / (curK * curMs)]);
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+}
+
+// GM-only: draw AoE marker labels in screen space above each marker center.
+function drawAoeMarkerLabels() {
+  if (isPlayer) return;
+  const list = state.aoeMarkers || [];
+  if (!list.length) return;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.font = "bold 13px Inter, ui-sans-serif, sans-serif";
+  list.forEach((m) => {
+    if (!m.label) return;
+    const size = aoePxSize(m);
+    const center = nativeToScreen({ x: m.x, y: m.y - size * 0.15 });
+    const tw = ctx.measureText(m.label).width;
+    const pad = 5;
+    const bw = tw + pad * 2;
+    const bh = 18;
+    ctx.fillStyle = "rgba(0,0,0,0.65)";
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(center.x - bw / 2, center.y - bh, bw, bh, 3);
+    } else {
+      ctx.rect(center.x - bw / 2, center.y - bh, bw, bh);
+    }
+    ctx.fill();
+    ctx.fillStyle = m.color;
+    ctx.fillText(m.label, center.x, center.y - 2);
+  });
+  ctx.restore();
 }
 
 // Rebuild the preset size buttons for the current shape.
@@ -3034,6 +3200,13 @@ function updateSelectionPanels() {
   if (controls.noteSelPanel) {
     controls.noteSelPanel.classList.toggle("hidden", !selectedNote);
     if (selectedNote && controls.noteSize) controls.noteSize.value = selectedNote.scale || 1;
+  }
+  if (controls.aoeMarkerSelPanel) {
+    controls.aoeMarkerSelPanel.classList.toggle("hidden", !selectedAoeMarker);
+    if (selectedAoeMarker) {
+      if (controls.aoeMarkerLabel) controls.aoeMarkerLabel.value = selectedAoeMarker.label || "";
+      if (controls.aoeMarkerShowPlayers) controls.aoeMarkerShowPlayers.checked = !!selectedAoeMarker.showPlayers;
+    }
   }
 }
 
@@ -3593,7 +3766,9 @@ function onPointerDown(event) {
   }
 
   if (mode === "aoe") {
-    return; // hover-only: no click/drag action
+    if (!state.imageData) return;
+    placeAoeMarker(toNativePoint(event));
+    return;
   }
 
   if (mode === "polygon" || mode === "namedPolygon") {
@@ -3643,7 +3818,7 @@ function onPointerDown(event) {
         selectedToken = token;
         tokenPath = [{ x: token.x, y: token.y }];
       }
-      selectedImage = selectedNote = null;
+      selectedImage = selectedNote = selectedAoeMarker = null;
       updateSelectionPanels();
       draggingToken = token;
       tokenDragMoved = false;
@@ -3656,7 +3831,7 @@ function onPointerDown(event) {
     if (note) {
       pushHistory();
       selectedNote = note;
-      selectedToken = selectedImage = null;
+      selectedToken = selectedImage = selectedAoeMarker = null;
       draggingNote = note;
       dragGrab = { dx: note.x - native.x, dy: note.y - native.y };
       isDragging = true;
@@ -3669,7 +3844,7 @@ function onPointerDown(event) {
     if (image) {
       pushHistory();
       selectedImage = image;
-      selectedToken = selectedNote = null;
+      selectedToken = selectedNote = selectedAoeMarker = null;
       draggingImage = image;
       dragGrab = { dx: image.x - native.x, dy: image.y - native.y };
       isDragging = true;
@@ -3684,14 +3859,23 @@ function onPointerDown(event) {
       if (idx !== -1) goToFloor(idx);
       return;
     }
+    const aoeMarker = hitAoeMarker(native);
+    if (aoeMarker) {
+      selectedAoeMarker = aoeMarker;
+      selectedToken = selectedImage = selectedNote = null;
+      tokenPath = null;
+      updateSelectionPanels();
+      render();
+      return;
+    }
     // Dragging the red player-view frame pans the player display in real time.
     const frame = playerFrameCorners();
     if (frame && pointInPolygon(clientToCanvasPoint(event), frame)) {
       startFrameDrag(native, event.pointerId);
       return;
     }
-    if (selectedToken || selectedImage || selectedNote) {
-      selectedToken = selectedImage = selectedNote = null;
+    if (selectedToken || selectedImage || selectedNote || selectedAoeMarker) {
+      selectedToken = selectedImage = selectedNote = selectedAoeMarker = null;
       tokenPath = null;
       updateSelectionPanels();
       render();
@@ -3958,6 +4142,12 @@ function onDoubleClick(event) {
     toggleFullscreen();
     return;
   }
+  const native = toNativePoint(event);
+  const aoeMarker = hitAoeMarker(native);
+  if (aoeMarker) {
+    editAoeMarkerLabel(aoeMarker);
+    return;
+  }
   const note = hitNote(clientToCanvasPoint(event));
   if (note) {
     editNote(note);
@@ -3969,6 +4159,15 @@ function onDoubleClick(event) {
 function onContextMenu(event) {
   if (isPlayer) return;
   event.preventDefault();
+  const native = toNativePoint(event);
+  const aoeMarker = hitAoeMarker(native);
+  if (aoeMarker) {
+    pushHistory();
+    if (aoeMarker === selectedAoeMarker) { selectedAoeMarker = null; updateSelectionPanels(); }
+    state.aoeMarkers = state.aoeMarkers.filter((m) => m !== aoeMarker);
+    renderAndSync();
+    return;
+  }
   const note = hitNote(clientToCanvasPoint(event));
   if (note) {
     pushHistory();
@@ -3977,7 +4176,7 @@ function onContextMenu(event) {
     render();
     return;
   }
-  deleteTokenOrRoom(toNativePoint(event));
+  deleteTokenOrRoom(native);
 }
 
 function onKeyDown(event) {
@@ -4051,6 +4250,15 @@ function onKeyDown(event) {
     state.notes = state.notes.filter((n) => n !== selectedNote);
     selectedNote = null;
     render(); // notes are GM-only
+    return;
+  }
+  if (selectedAoeMarker && (event.key === "Delete" || event.key === "Backspace")) {
+    event.preventDefault();
+    pushHistory();
+    state.aoeMarkers = state.aoeMarkers.filter((m) => m !== selectedAoeMarker);
+    selectedAoeMarker = null;
+    updateSelectionPanels();
+    renderAndSync();
     return;
   }
   if (event.key === "Enter" && drawingPolygon) {
