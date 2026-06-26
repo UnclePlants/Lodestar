@@ -133,14 +133,18 @@ const controls = {
   lockPlayerSquare: document.getElementById("lockPlayerSquare"),
   stairColor: document.getElementById("stairColor"),
   addImageInput: document.getElementById("addImageInput"),
-  addNoteBtn: document.getElementById("addNoteBtn"),
+  addImageBtn: document.getElementById("addImageBtn"),
+  noteMode: document.getElementById("noteMode"),
+  noteLayer: document.getElementById("noteLayer"),
+  noteFormatBar: document.getElementById("noteFormatBar"),
+  noteFontSel: document.getElementById("noteFontSel"),
+  noteSizeSel: document.getElementById("noteSizeSel"),
+  pdfBtn: document.getElementById("pdfBtn"),
+  pdfFileInput: document.getElementById("pdfFileInput"),
+  pdfLayer: document.getElementById("pdfLayer"),
   imageSnap: document.getElementById("imageSnap"),
-  imageSelPanel: document.getElementById("imageSelPanel"),
+  imageHandles: document.getElementById("imageHandles"),
   imageShowPlayers: document.getElementById("imageShowPlayers"),
-  imageSize: document.getElementById("imageSize"),
-  imageRotation: document.getElementById("imageRotation"),
-  noteSelPanel: document.getElementById("noteSelPanel"),
-  noteSize: document.getElementById("noteSize"),
   aoeMarkerSelPanel: document.getElementById("aoeMarkerSelPanel"),
   aoeMarkerLabel: document.getElementById("aoeMarkerLabel"),
   aoeMarkerShowPlayers: document.getElementById("aoeMarkerShowPlayers"),
@@ -336,7 +340,6 @@ let draggingToken = null;
 let tokenDragMoved = false; // becomes true once a token drag actually moves (defers undo history)
 let tokenPath = null; // route a selected token has taken (cell points), for the path + distance readout
 let draggingImage = null;
-let draggingNote = null;
 let draggingFrame = false; // GM is dragging the player-view frame to pan the player display
 let dragGrab = { dx: 0, dy: 0 }; // offset from cursor to object center while dragging images/notes/frame
 let measureLine = null;
@@ -717,7 +720,8 @@ function bindControls() {
 
   // Initiative tracker
   controls.initToggle?.addEventListener("click", toggleInitiative);
-  controls.initPanelToggle?.addEventListener("click", toggleInitiative);
+  // The right retract tab collapses/expands the whole right column (music + initiative).
+  controls.initPanelToggle?.addEventListener("click", toggleRightPanels);
   controls.initPrev?.addEventListener("click", () => stepInitiative(-1));
   controls.initNext?.addEventListener("click", () => stepInitiative(1));
   controls.initReset?.addEventListener("click", resetInitiative);
@@ -853,32 +857,24 @@ function bindControls() {
     if (file) addImageFile(file, state.view.cx, state.view.cy);
     event.target.value = "";
   });
-  controls.addNoteBtn?.addEventListener("click", addNote);
+  controls.addImageBtn?.addEventListener("click", () => controls.addImageInput?.click());
+  controls.noteMode?.addEventListener("click", () => setMode("note"));
+  controls.pdfBtn?.addEventListener("click", () => controls.pdfFileInput?.click());
+  controls.pdfFileInput?.addEventListener("change", (event) => {
+    [...(event.target.files || [])].forEach(createPdfWindow);
+    event.target.value = "";
+  });
+  setupNoteFormatBar();
   controls.imageSnap?.addEventListener("input", () => {
     state.grid.snapImages = controls.imageSnap.checked;
   });
-  controls.imageShowPlayers?.addEventListener("input", () => {
+  controls.imageShowPlayers?.addEventListener("change", () => {
     if (!selectedImage) return;
+    pushHistory();
     selectedImage.showPlayers = controls.imageShowPlayers.checked;
     renderAndSync();
   });
-  controls.imageSize?.addEventListener("input", () => {
-    if (!selectedImage) return;
-    const aspect = selectedImage.w / selectedImage.h || 1;
-    selectedImage.w = Number(controls.imageSize.value);
-    selectedImage.h = selectedImage.w / aspect;
-    renderAndSync();
-  });
-  controls.imageRotation?.addEventListener("input", () => {
-    if (!selectedImage) return;
-    selectedImage.rotation = Number(controls.imageRotation.value);
-    renderAndSync();
-  });
-  controls.noteSize?.addEventListener("input", () => {
-    if (!selectedNote) return;
-    selectedNote.scale = Number(controls.noteSize.value);
-    render(); // notes are GM-only
-  });
+  setupImageHandles();
   controls.aoeMarkerLabel?.addEventListener("input", () => {
     if (!selectedAoeMarker) return;
     selectedAoeMarker.label = controls.aoeMarkerLabel.value;
@@ -1797,7 +1793,7 @@ function setMode(nextMode) {
   updateSelectionPanels();
   canvas.style.cursor = ""; // clear any frame-hover cursor
   controls.fogToggle?.classList.toggle("active", FOG_MODES.includes(nextMode));
-  [controls.panMode, controls.polygonMode, controls.namedPolygonMode, controls.brushMode, controls.eraserMode, controls.stampMode, controls.tokenMode, controls.aoeMode, controls.measureMode, controls.stairMode].forEach(
+  [controls.panMode, controls.polygonMode, controls.namedPolygonMode, controls.brushMode, controls.eraserMode, controls.stampMode, controls.tokenMode, controls.aoeMode, controls.measureMode, controls.stairMode, controls.noteMode].forEach(
     (button) => button?.classList.remove("active"),
   );
   controls[`${nextMode}Mode`]?.classList.add("active");
@@ -1812,6 +1808,7 @@ function setMode(nextMode) {
     aoe: "Hover to preview. Click to drop a persistent AoE marker (prompts for label). Right-click a marker to remove it. Double-click a marker to edit its label. Mouse wheel rotates the cone.",
     measure: "Drag to measure distance across the grid.",
     stair: "Click to place a staircase. Right-click a stair to remove it.",
+    note: "Click the map to drop a note (GM-only). Type to edit; use the bar above it to format. Drag the title strip to move, drag the corner to resize.",
   }[nextMode] ?? "";
 
   // Shared fog-options popover: shown for all fog tools, with tool-specific rows toggled.
@@ -2274,7 +2271,8 @@ function render() {
   if (!isPlayer) drawTokenMoveLabel();
   if (!isPlayer && mode === "pan" && !draggingToken) drawOrientationArrows();
   if (!isPlayer) drawRoomNames();
-  if (!isPlayer) drawNotes();
+  if (!isPlayer) syncNoteLayer();
+  if (!isPlayer) syncImageHandles();
   if (!isPlayer) drawAoeMarkerLabels();
   if (!isPlayer) drawPlayerFrame();
 }
@@ -3218,82 +3216,478 @@ function hitImage(native) {
   return null;
 }
 
-// Notes are GM-only sticky labels anchored to a native point but drawn in screen space so the
-// text stays a constant, readable size and orientation at any zoom or rotation.
-function wrapNoteText(text, maxW) {
-  const out = [];
-  String(text || "").split("\n").forEach((para) => {
-    const words = para.split(/\s+/);
-    let line = "";
-    words.forEach((w) => {
-      const test = line ? line + " " + w : w;
-      if (line && ctx.measureText(test).width > maxW) {
-        out.push(line);
-        line = w;
-      } else {
-        line = test;
-      }
-    });
-    out.push(line);
-  });
-  return out.length ? out : [""];
-}
+/* ----------------------------- notes (GM-only HTML overlay) -----------------------------
 
-function noteFont(note) {
-  return `600 ${Math.round(13 * (note.scale || 1))}px Inter, ui-sans-serif, sans-serif`;
-}
+Notes are rich-text sticky notes living in `#noteLayer`, a DOM layer over the canvas. Each is
+anchored to a native point and scales with the map: a CSS transform translates it to the note's
+screen position and scales it by the current view scale, so it tracks pan/zoom and stays
+grid-relative. Notes are GM-only — they're in `state.notes` (per-floor) but stripped from the
+player sync (see sanitizedState / loadSnapshot). */
 
-function noteLayout(note) {
-  const sc = note.scale || 1;
-  ctx.save();
-  ctx.font = noteFont(note);
-  const padX = 9 * sc;
-  const padY = 7 * sc;
-  const lh = 17 * sc;
-  const boxW = 176 * sc;
-  const lines = wrapNoteText(note.text, boxW - padX * 2);
-  ctx.restore();
-  return { lines, padX, padY, lh, boxW, boxH: padY * 2 + lines.length * lh };
-}
+const NOTE_DEFAULT_CELLS = 3; // default note width in grid squares
+const NOTE_BASE_FONT = 15; // base body font size, in native px (scales with the note)
+const NOTE_FONTS = "Georgia, serif";
+const noteEls = new Map(); // note id -> root element
+let editingNoteId = null; // note whose body is focused (don't clobber its innerHTML)
+let activeNote = null; // note the floating format bar currently targets
+let noteDrag = null; // { note, startX, startY, ox, oy }
+let noteResize = null; // { note, startX, w0 }
 
-function noteScreenRect(note) {
-  const s = nativeToScreen({ x: note.x, y: note.y });
-  const { boxW, boxH } = noteLayout(note);
-  return { x: s.x, y: s.y, w: boxW, h: boxH };
-}
-
-function drawNotes() {
-  const list = state.notes || [];
-  if (!list.length) return;
-  ctx.save();
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  list.forEach((note) => {
-    const s = nativeToScreen({ x: note.x, y: note.y });
-    const { lines, padX, padY, lh, boxW, boxH } = noteLayout(note);
-    ctx.font = noteFont(note);
-    const sel = note === selectedNote;
-    ctx.fillStyle = "rgba(244, 226, 140, 0.95)";
-    ctx.strokeStyle = sel ? "#b1c301" : "rgba(0,0,0,0.45)";
-    ctx.lineWidth = sel ? 2 : 1;
-    ctx.beginPath();
-    ctx.rect(s.x, s.y, boxW, boxH);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#1a1400";
-    lines.forEach((ln, i) => ctx.fillText(ln, s.x + padX, s.y + padY + i * lh));
-  });
-  ctx.restore();
-}
-
-function hitNote(screenPt) {
-  for (let i = state.notes.length - 1; i >= 0; i--) {
-    const r = noteScreenRect(state.notes[i]);
-    if (screenPt.x >= r.x && screenPt.x <= r.x + r.w && screenPt.y >= r.y && screenPt.y <= r.y + r.h) {
-      return state.notes[i];
-    }
+// Upgrade legacy `{text,scale}` notes to the rich `{x,y,w,html,font}` shape (idempotent).
+function normalizeNote(note) {
+  if (note.html === undefined) {
+    note.html = escapeHtml(note.text != null ? note.text : "").replace(/\n/g, "<br>");
+    delete note.text;
   }
-  return null;
+  if (typeof note.w !== "number" || note.w <= 0) note.w = NOTE_DEFAULT_CELLS * gridCellNative();
+  if (!note.font) note.font = NOTE_FONTS;
+  if (typeof note.size !== "number" || note.size <= 0) note.size = 1; // whole-note font scale
+  delete note.scale;
+  return note;
+}
+
+function addNoteAt(native) {
+  pushHistory();
+  const note = { id: uuid(), x: native.x, y: native.y, w: NOTE_DEFAULT_CELLS * gridCellNative(), html: "", font: NOTE_FONTS };
+  state.notes.push(note);
+  render();
+  // Focus the freshly created note's body for immediate typing.
+  requestAnimationFrame(() => {
+    const el = noteEls.get(note.id);
+    el?.querySelector(".map-note-body")?.focus();
+  });
+}
+
+function deleteNote(note) {
+  pushHistory();
+  if (activeNote === note) hideNoteFormatBar();
+  state.notes = state.notes.filter((n) => n !== note);
+  const el = noteEls.get(note.id);
+  if (el) {
+    el.remove();
+    noteEls.delete(note.id);
+  }
+  render();
+}
+
+// Reconcile #noteLayer with state.notes and place each note in screen space (GM only).
+function syncNoteLayer() {
+  if (isPlayer || !controls.noteLayer) return;
+  const list = state.notes || [];
+  list.forEach(normalizeNote);
+  const ids = new Set(list.map((n) => n.id));
+  // Drop elements for notes that no longer exist (deleted, or floor switched).
+  noteEls.forEach((el, id) => {
+    if (!ids.has(id)) {
+      el.remove();
+      noteEls.delete(id);
+    }
+  });
+  const vs = curK * curMs; // native px -> screen px
+  list.forEach((note) => {
+    let el = noteEls.get(note.id);
+    if (!el) el = createNoteEl(note);
+    const s = nativeToScreen({ x: note.x, y: note.y });
+    el.style.transform = `translate(${s.x}px, ${s.y}px) scale(${vs})`;
+    el.style.width = `${note.w}px`;
+    el.style.fontFamily = note.font || NOTE_FONTS;
+    el.style.fontSize = `${NOTE_BASE_FONT * (note.size || 1)}px`;
+    const body = el._body;
+    // Only rewrite content when it changed externally (e.g. undo) and isn't being edited,
+    // so the caret never jumps mid-typing.
+    if (editingNoteId !== note.id && el._html !== note.html) {
+      body.innerHTML = note.html || "";
+      el._html = note.html;
+    }
+  });
+  if (activeNote) positionNoteFormatBar();
+}
+
+function createNoteEl(note) {
+  const el = document.createElement("div");
+  el.className = "map-note";
+  el.dataset.id = note.id;
+  el.style.fontSize = `${NOTE_BASE_FONT}px`;
+  el.innerHTML =
+    '<div class="map-note-grip" title="Drag to move"><span class="map-note-dots">::</span>' +
+    '<button type="button" class="map-note-del" title="Delete note" aria-label="Delete note">&times;</button></div>' +
+    '<div class="map-note-body" contenteditable="true"></div>' +
+    '<div class="map-note-resize" title="Drag to resize"></div>';
+  const body = el.querySelector(".map-note-body");
+  el._body = body;
+  body.innerHTML = note.html || "";
+  el._html = note.html;
+
+  // Editing: snapshot once on focus, commit on input/blur. Show the format bar while focused.
+  body.addEventListener("focus", () => {
+    editingNoteId = note.id;
+    activeNote = note;
+    showNoteFormatBar(note, el);
+  });
+  body.addEventListener("input", () => {
+    note.html = body.innerHTML;
+    el._html = note.html;
+  });
+  body.addEventListener("blur", () => {
+    note.html = body.innerHTML;
+    el._html = note.html;
+    if (editingNoteId === note.id) editingNoteId = null;
+    // Defer so a click on the format bar (which blurs the body) keeps the bar open.
+    setTimeout(() => {
+      if (document.activeElement !== body && !controls.noteFormatBar?.contains(document.activeElement)) {
+        if (activeNote === note) hideNoteFormatBar();
+      }
+    }, 120);
+  });
+  body.addEventListener("pointerdown", () => {
+    pushHistory(); // capture a pre-edit snapshot when the GM starts interacting with the text
+  }, { once: true });
+
+  el.querySelector(".map-note-del").addEventListener("click", (e) => {
+    e.preventDefault();
+    deleteNote(note);
+  });
+  el.querySelector(".map-note-grip").addEventListener("pointerdown", (e) => startNoteDrag(e, note));
+  el.querySelector(".map-note-resize").addEventListener("pointerdown", (e) => startNoteResize(e, note));
+
+  controls.noteLayer.appendChild(el);
+  noteEls.set(note.id, el);
+  return el;
+}
+
+function startNoteDrag(e, note) {
+  e.preventDefault();
+  e.stopPropagation();
+  pushHistory();
+  noteDrag = { note, startX: e.clientX, startY: e.clientY, ox: note.x, oy: note.y };
+  window.addEventListener("pointermove", onNoteDragMove);
+  window.addEventListener("pointerup", endNoteDrag, { once: true });
+}
+
+function onNoteDragMove(e) {
+  if (!noteDrag) return;
+  const vs = curK * curMs || 1;
+  noteDrag.note.x = noteDrag.ox + (e.clientX - noteDrag.startX) / vs;
+  noteDrag.note.y = noteDrag.oy + (e.clientY - noteDrag.startY) / vs;
+  render();
+}
+
+function endNoteDrag() {
+  noteDrag = null;
+  window.removeEventListener("pointermove", onNoteDragMove);
+}
+
+function startNoteResize(e, note) {
+  e.preventDefault();
+  e.stopPropagation();
+  pushHistory();
+  noteResize = { note, startX: e.clientX, w0: note.w };
+  window.addEventListener("pointermove", onNoteResizeMove);
+  window.addEventListener("pointerup", endNoteResize, { once: true });
+}
+
+function onNoteResizeMove(e) {
+  if (!noteResize) return;
+  const vs = curK * curMs || 1;
+  noteResize.note.w = Math.max(40, noteResize.w0 + (e.clientX - noteResize.startX) / vs);
+  render();
+}
+
+function endNoteResize() {
+  noteResize = null;
+  window.removeEventListener("pointermove", onNoteResizeMove);
+}
+
+// --- floating format bar ---
+
+function setupNoteFormatBar() {
+  const bar = controls.noteFormatBar;
+  if (!bar) return;
+  // Keep focus/selection in the note when using the bar (don't let buttons steal focus).
+  bar.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button")) e.preventDefault();
+  });
+  // Dismiss the bar when clicking away from any note and the bar itself.
+  document.addEventListener("pointerdown", (e) => {
+    if (!activeNote) return;
+    if (e.target.closest(".map-note") || e.target.closest("#noteFormatBar")) return;
+    hideNoteFormatBar();
+  });
+  bar.querySelectorAll("[data-fmt]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.execCommand(btn.dataset.fmt, false, null);
+      commitActiveNote();
+    });
+  });
+  controls.noteFontSel?.addEventListener("change", () => {
+    if (!activeNote) return;
+    activeNote.font = controls.noteFontSel.value;
+    const el = noteEls.get(activeNote.id);
+    if (el) el.style.fontFamily = activeNote.font;
+  });
+  controls.noteSizeSel?.addEventListener("change", () => {
+    if (!activeNote) return;
+    activeNote.size = Number(controls.noteSizeSel.value) || 1;
+    const el = noteEls.get(activeNote.id);
+    if (el) el.style.fontSize = `${NOTE_BASE_FONT * activeNote.size}px`;
+  });
+}
+
+function commitActiveNote() {
+  if (!activeNote) return;
+  const el = noteEls.get(activeNote.id);
+  if (!el) return;
+  activeNote.html = el._body.innerHTML;
+  el._html = activeNote.html;
+  el._body.focus();
+}
+
+function showNoteFormatBar(note, el) {
+  const bar = controls.noteFormatBar;
+  if (!bar) return;
+  activeNote = note;
+  if (controls.noteFontSel) controls.noteFontSel.value = note.font || NOTE_FONTS;
+  if (controls.noteSizeSel) controls.noteSizeSel.value = String(note.size || 1);
+  bar.hidden = false;
+  positionNoteFormatBar(el);
+}
+
+function hideNoteFormatBar() {
+  activeNote = null;
+  if (controls.noteFormatBar) controls.noteFormatBar.hidden = true;
+}
+
+function positionNoteFormatBar(el) {
+  const bar = controls.noteFormatBar;
+  if (!bar || !activeNote) return;
+  el = el || noteEls.get(activeNote.id);
+  if (!el) return;
+  const stage = el.offsetParent || el.parentElement;
+  const r = el.getBoundingClientRect();
+  const base = stage.getBoundingClientRect();
+  let left = r.left - base.left;
+  let top = r.top - base.top - bar.offsetHeight - 6;
+  if (top < 4) top = r.bottom - base.top + 6; // flip below if there's no room above
+  bar.style.left = `${Math.max(4, left)}px`;
+  bar.style.top = `${top}px`;
+}
+
+/* ----------------------------- selected-image transform box -----------------------------
+
+When an image is selected in Move mode, #imageHandles overlays the canvas with four corner
+resize grips, a top rotation ball, and a "show to players" toggle, all positioned in screen
+space so they track pan/zoom/rotation. Resizing keeps the image's aspect ratio. */
+
+let imageEdit = null; // { mode:"resize"|"rotate", im, w0, h0, aspect }
+
+// A native point expressed in an image's local (un-rotated) frame, relative to its center.
+function imageLocalPoint(im, p) {
+  const r = -((im.rotation || 0) * Math.PI) / 180;
+  const dx = p.x - im.x;
+  const dy = p.y - im.y;
+  return { x: dx * Math.cos(r) - dy * Math.sin(r), y: dx * Math.sin(r) + dy * Math.cos(r) };
+}
+
+// Screen position of an image corner (sx,sy in {-1,1}), accounting for image + view rotation.
+function imageCornerScreen(im, sx, sy) {
+  const r = ((im.rotation || 0) * Math.PI) / 180;
+  const lx = (sx * im.w) / 2;
+  const ly = (sy * im.h) / 2;
+  return nativeToScreen({ x: im.x + lx * Math.cos(r) - ly * Math.sin(r), y: im.y + lx * Math.sin(r) + ly * Math.cos(r) });
+}
+
+function syncImageHandles() {
+  const box = controls.imageHandles;
+  if (!box) return;
+  const im = selectedImage;
+  if (isPlayer || !im || !(state.images || []).includes(im)) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  const corners = {
+    nw: imageCornerScreen(im, -1, -1),
+    ne: imageCornerScreen(im, 1, -1),
+    se: imageCornerScreen(im, 1, 1),
+    sw: imageCornerScreen(im, -1, 1),
+  };
+  box.querySelectorAll(".img-handle").forEach((h) => {
+    const c = corners[h.dataset.corner];
+    h.style.left = `${c.x}px`;
+    h.style.top = `${c.y}px`;
+  });
+  const center = nativeToScreen({ x: im.x, y: im.y });
+  const topMid = { x: (corners.nw.x + corners.ne.x) / 2, y: (corners.nw.y + corners.ne.y) / 2 };
+  let ux = topMid.x - center.x;
+  let uy = topMid.y - center.y;
+  const ulen = Math.hypot(ux, uy) || 1;
+  ux /= ulen;
+  uy /= ulen;
+  const ball = box.querySelector(".img-rot-ball");
+  ball.style.left = `${topMid.x + ux * 26}px`;
+  ball.style.top = `${topMid.y + uy * 26}px`;
+  const stem = box.querySelector(".img-rot-stem");
+  stem.style.left = `${topMid.x}px`;
+  stem.style.top = `${topMid.y}px`;
+  stem.style.transform = `rotate(${(Math.atan2(uy, ux) * 180) / Math.PI - 90}deg)`;
+  // Show-to-players toggle sits centered just below the image.
+  const cx = (corners.nw.x + corners.ne.x + corners.se.x + corners.sw.x) / 4;
+  const maxY = Math.max(corners.nw.y, corners.ne.y, corners.se.y, corners.sw.y);
+  const chk = box.querySelector(".img-show-players");
+  chk.style.left = `${cx}px`;
+  chk.style.top = `${maxY + 10}px`;
+  if (controls.imageShowPlayers) controls.imageShowPlayers.checked = !!im.showPlayers;
+}
+
+function setupImageHandles() {
+  const box = controls.imageHandles;
+  if (!box) return;
+  box.querySelectorAll(".img-handle").forEach((h) => h.addEventListener("pointerdown", startImageResize));
+  box.querySelector(".img-rot-ball")?.addEventListener("pointerdown", startImageRotate);
+}
+
+function startImageResize(e) {
+  if (!selectedImage) return;
+  e.preventDefault();
+  e.stopPropagation();
+  pushHistory();
+  const im = selectedImage;
+  imageEdit = { mode: "resize", im, w0: im.w, h0: im.h, aspect: im.w / im.h || 1 };
+  window.addEventListener("pointermove", onImageEditMove);
+  window.addEventListener("pointerup", endImageEdit, { once: true });
+}
+
+function startImageRotate(e) {
+  if (!selectedImage) return;
+  e.preventDefault();
+  e.stopPropagation();
+  pushHistory();
+  imageEdit = { mode: "rotate", im: selectedImage };
+  window.addEventListener("pointermove", onImageEditMove);
+  window.addEventListener("pointerup", endImageEdit, { once: true });
+}
+
+function onImageEditMove(e) {
+  if (!imageEdit) return;
+  const im = imageEdit.im;
+  const p = toNativePoint(e);
+  if (imageEdit.mode === "resize") {
+    const l = imageLocalPoint(im, p);
+    const factor = Math.max(Math.abs(l.x) / (imageEdit.w0 / 2), Math.abs(l.y) / (imageEdit.h0 / 2)) || 1;
+    im.w = Math.max(20, imageEdit.w0 * factor);
+    im.h = im.w / imageEdit.aspect; // aspect maintained
+  } else {
+    const ang = (Math.atan2(p.y - im.y, p.x - im.x) * 180) / Math.PI;
+    im.rotation = (((ang + 90) % 360) + 360) % 360; // local "up" points at the cursor
+  }
+  render();
+}
+
+function endImageEdit() {
+  imageEdit = null;
+  window.removeEventListener("pointermove", onImageEditMove);
+  renderAndSync(); // push the resized/rotated image to players
+}
+
+/* ----------------------------- DM-only PDF windows -----------------------------
+
+Floating, draggable/resizable viewers for character sheets and reference docs. Session-only:
+the file is shown via an object URL in a native <iframe> (no external library), and nothing
+here ever touches `state`, so PDFs are never synced to players or saved into a map. */
+
+const pdfWindows = []; // { el, url }
+let pdfZ = 40;
+
+function createPdfWindow(file) {
+  if (!file || file.type !== "application/pdf" || !controls.pdfLayer) return;
+  const url = URL.createObjectURL(file);
+  const el = document.createElement("div");
+  el.className = "pdf-window";
+  el.style.left = `${40 + (pdfWindows.length % 6) * 26}px`;
+  el.style.top = `${40 + (pdfWindows.length % 6) * 26}px`;
+  el.style.zIndex = ++pdfZ;
+  el.innerHTML =
+    '<div class="pdf-head"><span class="pdf-title"></span>' +
+    '<button class="pdf-swap" type="button" title="Open a different PDF here">Swap</button>' +
+    '<button class="pdf-close" type="button" title="Close" aria-label="Close">&times;</button></div>' +
+    '<iframe class="pdf-frame" title="PDF document"></iframe>' +
+    '<div class="pdf-resize" title="Drag to resize"></div>';
+  el.querySelector(".pdf-title").textContent = file.name;
+  el.querySelector(".pdf-frame").src = url;
+  const rec = { el, url };
+  el.addEventListener("pointerdown", () => (el.style.zIndex = ++pdfZ));
+  el.querySelector(".pdf-head").addEventListener("pointerdown", (e) => startPdfDrag(e, el));
+  el.querySelector(".pdf-close").addEventListener("click", () => closePdfWindow(rec));
+  el.querySelector(".pdf-swap").addEventListener("click", () => swapPdf(rec));
+  el.querySelector(".pdf-resize").addEventListener("pointerdown", (e) => startPdfResize(e, el));
+  controls.pdfLayer.appendChild(el);
+  pdfWindows.push(rec);
+}
+
+// During a drag/resize the iframe must not swallow pointer moves.
+function pdfFramePointer(el, on) {
+  const f = el.querySelector(".pdf-frame");
+  if (f) f.style.pointerEvents = on ? "" : "none";
+}
+
+function startPdfDrag(e, el) {
+  if (e.target.closest("button")) return;
+  e.preventDefault();
+  pdfFramePointer(el, false);
+  const ox = el.offsetLeft - e.clientX;
+  const oy = el.offsetTop - e.clientY;
+  const move = (ev) => {
+    el.style.left = `${ev.clientX + ox}px`;
+    el.style.top = `${ev.clientY + oy}px`;
+  };
+  const up = () => {
+    pdfFramePointer(el, true);
+    window.removeEventListener("pointermove", move);
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up, { once: true });
+}
+
+function startPdfResize(e, el) {
+  e.preventDefault();
+  e.stopPropagation();
+  pdfFramePointer(el, false);
+  const sx = e.clientX;
+  const sy = e.clientY;
+  const w0 = el.offsetWidth;
+  const h0 = el.offsetHeight;
+  const move = (ev) => {
+    el.style.width = `${Math.max(220, w0 + ev.clientX - sx)}px`;
+    el.style.height = `${Math.max(160, h0 + ev.clientY - sy)}px`;
+  };
+  const up = () => {
+    pdfFramePointer(el, true);
+    window.removeEventListener("pointermove", move);
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up, { once: true });
+}
+
+function closePdfWindow(rec) {
+  URL.revokeObjectURL(rec.url);
+  rec.el.remove();
+  const i = pdfWindows.indexOf(rec);
+  if (i >= 0) pdfWindows.splice(i, 1);
+}
+
+function swapPdf(rec) {
+  const inp = document.createElement("input");
+  inp.type = "file";
+  inp.accept = "application/pdf";
+  inp.addEventListener("change", () => {
+    const f = inp.files?.[0];
+    if (!f) return;
+    URL.revokeObjectURL(rec.url);
+    rec.url = URL.createObjectURL(f);
+    rec.el.querySelector(".pdf-frame").src = rec.url;
+    rec.el.querySelector(".pdf-title").textContent = f.name;
+  });
+  inp.click();
 }
 
 // Add a map image from a (raw) data URL, centered at native (nx, ny). Downscaled to bound size.
@@ -3325,41 +3719,10 @@ function addImageFile(file, nx, ny) {
   reader.readAsDataURL(file);
 }
 
-function addNote() {
-  const text = window.prompt("Note text (GM only):", "");
-  if (text === null) return;
-  pushHistory();
-  const note = { id: uuid(), x: state.view.cx, y: state.view.cy, text: text || "Note", scale: 1 };
-  state.notes.push(note);
-  selectedToken = selectedImage = null;
-  selectedNote = note;
-  updateSelectionPanels();
-  render(); // notes are GM-only, no broadcast needed
-}
-
-function editNote(note) {
-  const text = window.prompt("Edit note (GM only):", note.text || "");
-  if (text === null) return;
-  pushHistory();
-  note.text = text;
-  render();
-}
-
-// Show/populate the View-section panels for the currently selected image or note.
+// Show/populate the contextual panels for the current selection.
 function updateSelectionPanels() {
   if (isPlayer) return;
-  if (controls.imageSelPanel) {
-    controls.imageSelPanel.classList.toggle("hidden", !selectedImage);
-    if (selectedImage) {
-      if (controls.imageShowPlayers) controls.imageShowPlayers.checked = !!selectedImage.showPlayers;
-      if (controls.imageSize) controls.imageSize.value = Math.round(selectedImage.w);
-      if (controls.imageRotation) controls.imageRotation.value = Math.round(selectedImage.rotation || 0);
-    }
-  }
-  if (controls.noteSelPanel) {
-    controls.noteSelPanel.classList.toggle("hidden", !selectedNote);
-    if (selectedNote && controls.noteSize) controls.noteSize.value = selectedNote.scale || 1;
-  }
+  syncImageHandles(); // the selected image's on-canvas transform box
   if (controls.aoeMarkerSelPanel) {
     controls.aoeMarkerSelPanel.classList.toggle("hidden", !selectedAoeMarker);
     if (selectedAoeMarker) {
@@ -3439,9 +3802,19 @@ function toggleInitiative() {
 
 function setInitiativeActive(on) {
   state.initiative.active = on;
+  if (on) shell.classList.remove("right-collapsed"); // opening a panel un-retracts the column
   updateInitiativeUI();
   broadcastState();
   // The docked panel adds/removes a layout column, so the canvas must re-measure.
+  requestAnimationFrame(() => {
+    resizeCanvas();
+    render();
+  });
+}
+
+// Collapse/expand the entire right column (music + initiative) via the retract tab.
+function toggleRightPanels() {
+  shell.classList.toggle("right-collapsed");
   requestAnimationFrame(() => {
     resizeCanvas();
     render();
@@ -3731,7 +4104,10 @@ function toggleMusic() {
 function setMusicActive(on) {
   shell.classList.toggle("has-music", on);
   controls.musicToggle?.classList.toggle("active", on);
-  if (on) renderMusicPanel();
+  if (on) {
+    shell.classList.remove("right-collapsed"); // opening a panel un-retracts the column
+    renderMusicPanel();
+  }
   // The docked panel adds/removes a layout column, so the canvas must re-measure.
   requestAnimationFrame(() => {
     resizeCanvas();
@@ -3771,6 +4147,7 @@ function loadBedFile(bed, file) {
     const id = uuid();
     music.library[id] = { id, name: file.name, src };
     setBedClip(bed, id);
+    syncCurrentScene(); // a loaded track updates the selected scene
   });
 }
 
@@ -3827,6 +4204,7 @@ function setBedLoop(bed, loop) {
   music.beds[bed].loop = loop;
   if (bedAudio[bed]) bedAudio[bed].loop = loop;
   relayMusic({ action: "loop", track: bed, loop });
+  syncCurrentScene();
 }
 
 function setBedVolume(bed, volume) {
@@ -3842,6 +4220,7 @@ function loadSfxFile(file) {
     const id = uuid();
     music.library[id] = { id, name: file.name, src };
     music.sfxIds.push(id);
+    syncCurrentScene();
     renderMusicPanel();
   });
 }
@@ -3867,23 +4246,40 @@ function removeSfx(id) {
     audio.pause();
     sfxAudioCache.delete(id);
   }
+  syncCurrentScene();
   pruneLibrary();
   renderMusicPanel();
 }
 
 // --- scenes (saved sets of both beds + SFX) ----------------------------------
 
+// Snapshot the live beds + SFX into a scene object.
+function captureScene(scene) {
+  scene.music = { id: music.beds.music.id, loop: music.beds.music.loop };
+  scene.ambience = { id: music.beds.ambience.id, loop: music.beds.ambience.loop };
+  scene.sfxIds = [...music.sfxIds];
+}
+
+// While a scene is selected, edits (loading a track, toggling loop, adding/removing SFX)
+// update that scene so it stays a distinct, editable preset instead of reverting on reload.
+function syncCurrentScene() {
+  const scene = music.scenes.find((s) => s.id === music.currentSceneId);
+  if (scene) {
+    captureScene(scene);
+    renderMusicPanel();
+  }
+}
+
 function saveScene() {
   const fallback = `Scene ${music.scenes.length + 1}`;
   const name = window.prompt("Name this scene:", fallback);
   if (name === null) return;
-  music.scenes.push({
-    id: uuid(),
-    name: name.trim() || fallback,
-    music: { id: music.beds.music.id, loop: music.beds.music.loop },
-    ambience: { id: music.beds.ambience.id, loop: music.beds.ambience.loop },
-    sfxIds: [...music.sfxIds],
-  });
+  const scene = { id: uuid(), name: name.trim() || fallback };
+  captureScene(scene);
+  music.scenes.push(scene);
+  // Saved as a preset, but leave nothing "selected" so the next load is free working state
+  // (load A → save, load B → save makes two distinct scenes). Click a scene to edit it.
+  music.currentSceneId = "";
   renderMusicPanel();
 }
 
@@ -4465,7 +4861,13 @@ function onPointerDown(event) {
     return;
   }
 
-  // In Move mode: click a token to select it and drag to move it, a note or image to
+  if (mode === "note") {
+    if (!state.imageData) return;
+    addNoteAt(native);
+    return;
+  }
+
+  // In Move mode: click a token to select it and drag to move it, or an image to
   // select+drag it, or a stair to jump floors. Clicking empty space clears selection and pans.
   if (mode === "pan") {
     // Clicking an orientation arrow steps the selected token one cell that way.
@@ -4490,19 +4892,6 @@ function onPointerDown(event) {
       tokenDragMoved = false;
       isDragging = true;
       capturePointer(event.pointerId);
-      render();
-      return;
-    }
-    const note = hitNote(clientToCanvasPoint(event));
-    if (note) {
-      pushHistory();
-      selectedNote = note;
-      selectedToken = selectedImage = selectedAoeMarker = null;
-      draggingNote = note;
-      dragGrab = { dx: note.x - native.x, dy: note.y - native.y };
-      isDragging = true;
-      capturePointer(event.pointerId);
-      updateSelectionPanels();
       render();
       return;
     }
@@ -4653,13 +5042,6 @@ function onPointerMove(event) {
     return;
   }
 
-  if (draggingNote) {
-    const native = toNativePoint(event);
-    draggingNote.x = native.x + dragGrab.dx;
-    draggingNote.y = native.y + dragGrab.dy;
-    render();
-    return;
-  }
 
   if (measureLine) {
     measureLine.end = toNativePoint(event);
@@ -4739,11 +5121,6 @@ function onPointerUp(event) {
     renderAndSync(); // sync the moved image to players
   }
 
-  if (draggingNote) {
-    draggingNote = null;
-    render(); // notes are GM-only
-  }
-
   if (draggingFrame) {
     draggingFrame = false;
     renderAndSync(); // persist the player view position
@@ -4814,11 +5191,6 @@ function onDoubleClick(event) {
     editAoeMarkerLabel(aoeMarker);
     return;
   }
-  const note = hitNote(clientToCanvasPoint(event));
-  if (note) {
-    editNote(note);
-    return;
-  }
   if (mode === "polygon" || mode === "namedPolygon") finishRoom();
 }
 
@@ -4832,14 +5204,6 @@ function onContextMenu(event) {
     if (aoeMarker === selectedAoeMarker) { selectedAoeMarker = null; updateSelectionPanels(); }
     state.aoeMarkers = state.aoeMarkers.filter((m) => m !== aoeMarker);
     renderAndSync();
-    return;
-  }
-  const note = hitNote(clientToCanvasPoint(event));
-  if (note) {
-    pushHistory();
-    if (note === selectedNote) { selectedNote = null; updateSelectionPanels(); }
-    state.notes = state.notes.filter((n) => n !== note);
-    render();
     return;
   }
   deleteTokenOrRoom(native);
@@ -4860,6 +5224,7 @@ function onKeyDown(event) {
     return;
   }
   if (event.target?.matches?.("input, button, textarea, select")) return;
+  if (event.target?.isContentEditable) return; // typing in a note shouldn't trigger tool keys
 
   if (event.key === "?") {
     openShortcuts();
@@ -4917,14 +5282,6 @@ function onKeyDown(event) {
     selectedImage = null;
     updateSelectionPanels();
     renderAndSync();
-    return;
-  }
-  if (selectedNote && (event.key === "Delete" || event.key === "Backspace")) {
-    event.preventDefault();
-    pushHistory();
-    state.notes = state.notes.filter((n) => n !== selectedNote);
-    selectedNote = null;
-    render(); // notes are GM-only
     return;
   }
   if (selectedAoeMarker && (event.key === "Delete" || event.key === "Backspace")) {
