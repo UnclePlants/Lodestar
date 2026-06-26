@@ -170,6 +170,8 @@ const controls = {
   deleteFloor: document.getElementById("deleteFloor"),
   playerFloorBadge: document.getElementById("playerFloorBadge"),
   fitMapBtn: document.getElementById("fitMapBtn"),
+  shortcutsBtn: document.getElementById("shortcutsBtn"),
+  shortcutsDialog: document.getElementById("shortcutsDialog"),
   initToggle: document.getElementById("initToggle"),
   initiativePanel: document.getElementById("initiativePanel"),
   initiativeOverlay: document.getElementById("initiativeOverlay"),
@@ -186,6 +188,47 @@ const controls = {
   initRoll: document.getElementById("initRoll"),
   initHp: document.getElementById("initHp"),
   initType: document.getElementById("initType"),
+  musicToggle: document.getElementById("musicToggle"),
+  musicPanel: document.getElementById("musicPanel"),
+  musicSceneChips: document.getElementById("musicSceneChips"),
+  musicAddScene: document.getElementById("musicAddScene"),
+  musicDeleteScene: document.getElementById("musicDeleteScene"),
+  musicTrackLoad: document.getElementById("musicTrackLoad"),
+  musicTrackFile: document.getElementById("musicTrackFile"),
+  musicTrackName: document.getElementById("musicTrackName"),
+  musicTrackPlay: document.getElementById("musicTrackPlay"),
+  musicTrackLoop: document.getElementById("musicTrackLoop"),
+  musicTrackVol: document.getElementById("musicTrackVol"),
+  musicAmbienceLoad: document.getElementById("musicAmbienceLoad"),
+  musicAmbienceFile: document.getElementById("musicAmbienceFile"),
+  musicAmbienceName: document.getElementById("musicAmbienceName"),
+  musicAmbiencePlay: document.getElementById("musicAmbiencePlay"),
+  musicAmbienceLoop: document.getElementById("musicAmbienceLoop"),
+  musicAmbienceVol: document.getElementById("musicAmbienceVol"),
+  musicSfxLoad: document.getElementById("musicSfxLoad"),
+  musicSfxFile: document.getElementById("musicSfxFile"),
+  musicSfxList: document.getElementById("musicSfxList"),
+  musicSfxVol: document.getElementById("musicSfxVol"),
+};
+
+// Per-bed control lookup so the music code can treat the two looping layers identically.
+const bedControls = {
+  music: {
+    load: controls.musicTrackLoad,
+    file: controls.musicTrackFile,
+    name: controls.musicTrackName,
+    play: controls.musicTrackPlay,
+    loop: controls.musicTrackLoop,
+    vol: controls.musicTrackVol,
+  },
+  ambience: {
+    load: controls.musicAmbienceLoad,
+    file: controls.musicAmbienceFile,
+    name: controls.musicAmbienceName,
+    play: controls.musicAmbiencePlay,
+    loop: controls.musicAmbienceLoop,
+    vol: controls.musicAmbienceVol,
+  },
 };
 
 const isPlayer = new URLSearchParams(window.location.search).get("view") === "player";
@@ -281,6 +324,8 @@ let selectedToken = null; // token highlighted in Move mode for arrow-key nudgin
 let selectedImage = null; // map image selected in Move mode (GM only)
 let selectedNote = null; // floating note selected in Move mode (GM only)
 let selectedAoeMarker = null; // persistent AoE marker selected in Move mode (GM only)
+let linkingCombatantId = null; // GM: combatant awaiting a token click to link (initiative tracker)
+let linkHintPrev = null; // mode-hint text to restore when link mode ends
 let tokenImageData = ""; // image applied to newly placed tokens (data URL), authoring default
 const tokenImageCache = new Map(); // data URL -> HTMLImageElement, so token art draws each frame
 const IMAGE_MAX_EDGE = 1024; // cap dropped map images so saves/syncs stay bounded
@@ -319,6 +364,32 @@ let lockPlayerSquare = false;
 let lockedSquarePx = 0;
 const SQUARE_LOCK_KEY = "lodestar.squareLock";
 
+// Music player. Kept OUT of `state` so multi-MB audio never bloats per-map saves or the
+// regular player sync; playback is mirrored to the player window via dedicated "music"
+// messages instead. The library holds each loaded clip once (by id); the two looping
+// "beds" (music + ambience), the SFX rack, and saved scenes all reference clips by id.
+const BED_KEYS = ["music", "ambience"]; // two independent looping layers, can play together
+const music = {
+  library: {}, // id -> { id, name, src } (src is a data URL)
+  beds: {
+    music: { id: "", loop: true, volume: 0.7, playing: false },
+    ambience: { id: "", loop: true, volume: 0.7, playing: false },
+  },
+  sfxIds: [], // clips loaded into the SFX soundboard
+  sfxVolume: 1,
+  scenes: [], // [{ id, name, music:{id,loop}, ambience:{id,loop}, sfxIds:[] }]
+  currentSceneId: "",
+};
+// HTMLAudioElements live outside the data model. The GM owns the live bed elements; both
+// windows key them by bed name and keep a cache of one-shot SFX Audio elements by clip id.
+const bedAudio = { music: null, ambience: null };
+const sfxAudioCache = new Map(); // clip id -> HTMLAudioElement (one-shot)
+// Player side: which clip ids it has already received the data for (so the GM can skip
+// resending). Reset whenever a fresh player connects.
+const playerHasClip = new Set();
+let audioUnlocked = !isPlayer; // player must satisfy the autoplay gesture policy first
+let pendingPlayerMusic = null; // { bed, message } deferred until the player unlocks audio
+
 function handleMessage(message, source) {
   if (!message || typeof message !== "object") return;
   if (message.mid) {
@@ -334,10 +405,13 @@ function handleMessage(message, source) {
     measureLine = message.line;
     render();
   }
+  if (message.type === "music" && isPlayer) applyMusicMessage(message);
   if (message.type === "player-ready" && !isPlayer) {
     if (source) playerWindow = source;
+    playerHasClip.clear(); // a new display has none of the audio yet
     broadcastAssets();
     broadcastState();
+    resyncMusicToPlayer();
   }
   if (message.type === "request-assets" && !isPlayer) broadcastAssets();
   if (message.type === "viewport" && !isPlayer) {
@@ -675,6 +749,7 @@ function bindControls() {
     if (event.target.closest("[data-act='remove']")) removeCombatant(id);
     else if (event.target.closest("[data-act='hp-down']")) adjustHp(id, -1);
     else if (event.target.closest("[data-act='hp-up']")) adjustHp(id, 1);
+    else if (event.target.closest("[data-act='link']")) onInitLink(id, event.altKey);
     else if (event.target.closest("[data-act='set-turn']")) setTurnToId(id);
   });
   controls.initList?.addEventListener("change", (event) => {
@@ -692,6 +767,46 @@ function bindControls() {
     updateInitiativeUI();
     broadcastState();
   });
+  // Music player
+  controls.musicToggle?.addEventListener("click", toggleMusic);
+  // Both looping beds (Music + Ambiance) are wired identically.
+  BED_KEYS.forEach((bed) => {
+    const c = bedControls[bed];
+    c.load?.addEventListener("click", () => c.file?.click());
+    c.file?.addEventListener("change", (event) => {
+      const file = event.target.files?.[0];
+      if (file) loadBedFile(bed, file);
+      event.target.value = "";
+    });
+    c.play?.addEventListener("click", () => toggleBed(bed));
+    c.loop?.addEventListener("change", () => setBedLoop(bed, c.loop.checked));
+    c.vol?.addEventListener("input", () => setBedVolume(bed, Number(c.vol.value)));
+  });
+  controls.musicSfxLoad?.addEventListener("click", () => controls.musicSfxFile?.click());
+  controls.musicSfxFile?.addEventListener("change", (event) => {
+    [...(event.target.files || [])].forEach(loadSfxFile);
+    event.target.value = "";
+  });
+  controls.musicSfxVol?.addEventListener("input", () => {
+    music.sfxVolume = Number(controls.musicSfxVol.value);
+    relayMusic({ action: "volume", track: "sfx", volume: music.sfxVolume });
+  });
+  controls.musicSfxList?.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-sfx-id]");
+    if (!row) return;
+    const id = row.dataset.sfxId;
+    if (event.target.closest("[data-act='play']")) playSfx(id);
+    else if (event.target.closest("[data-act='del']")) removeSfx(id);
+  });
+  controls.musicAddScene?.addEventListener("click", saveScene);
+  controls.musicSceneChips?.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-scene-id]");
+    if (chip) loadScene(chip.dataset.sceneId);
+  });
+  controls.musicDeleteScene?.addEventListener("click", () => {
+    if (music.currentSceneId) deleteScene(music.currentSceneId);
+  });
+
   controls.clearFog.addEventListener("click", () => {
     clearFog();
     closeFogRibbon();
@@ -704,6 +819,7 @@ function bindControls() {
   controls.redo?.addEventListener("click", redo);
   controls.fitMap.addEventListener("click", () => fitMap(true));
   controls.fitMapBtn?.addEventListener("click", () => fitMap(true));
+  controls.shortcutsBtn?.addEventListener("click", openShortcuts);
 
   // Close the fog ribbon when clicking anywhere outside it (and outside its toggle).
   document.addEventListener("pointerdown", (event) => {
@@ -965,6 +1081,11 @@ async function openLibrary() {
   } catch (error) {
     window.alert(`Could not open the map library: ${error.message}`);
   }
+}
+
+function openShortcuts() {
+  if (controls.shortcutsDialog?.open) controls.shortcutsDialog.close();
+  else controls.shortcutsDialog?.showModal();
 }
 
 function renderLibraryList(maps) {
@@ -1661,6 +1782,7 @@ function toggleFogRibbon() {
 }
 
 function setMode(nextMode) {
+  exitLinkMode(); // leaving link mode if a tool is picked mid-link (restores the hint first)
   if (mode === "aoe" && nextMode !== "aoe") {
     aoeTemplate.visible = false;
     broadcastView();
@@ -2800,6 +2922,10 @@ function tokenOutline(token, r) {
 function drawTokens() {
   const lineW = Math.max(1, 2 / (curK * curMs));
   const rot = currentViewRotation();
+  const turnId = turnRingVisible() ? currentTurnCombatantId() : null;
+  // GM-only lookup so a linked token can show its combatant's HP on the battlefield.
+  const combatantById = {};
+  if (!isPlayer) state.initiative.combatants.forEach((c) => (combatantById[c.id] = c));
   state.tokens.forEach((token) => {
     const r = tokenRadius(token);
     ctx.save();
@@ -2839,6 +2965,21 @@ function drawTokens() {
         ctx.fillText(String(token.label).slice(0, 3), token.x, token.y);
       }
     }
+    // Current-turn ring: marks the active combatant's linked token on the battlefield
+    // (shown to whoever can see the order overlay). A bold ring plus a soft outer halo
+    // distinguishes it from the thin GM-only selection outline below.
+    if (turnId && token.combatantId === turnId) {
+      ctx.beginPath();
+      tokenOutline(token, r + 4 / (curK * curMs));
+      ctx.lineWidth = Math.max(2, 4 / (curK * curMs));
+      ctx.strokeStyle = "#b1c301";
+      ctx.stroke();
+      ctx.beginPath();
+      tokenOutline(token, r + 8 / (curK * curMs));
+      ctx.lineWidth = Math.max(1, 2 / (curK * curMs));
+      ctx.strokeStyle = "rgba(177,195,1,0.4)";
+      ctx.stroke();
+    }
     // Selection highlight (GM only): an accent outline around the active token.
     if (!isPlayer && token === selectedToken) {
       ctx.beginPath();
@@ -2847,8 +2988,27 @@ function drawTokens() {
       ctx.strokeStyle = "#b1c301";
       ctx.stroke();
     }
+    // GM-only HP bar for a linked combatant (never drawn on the player display, so monster
+    // health stays hidden from the table).
+    if (!isPlayer && token.combatantId) {
+      const c = combatantById[token.combatantId];
+      if (c && c.maxHp > 0 && c.hp != null) drawTokenHpBar(token, r, c);
+    }
     ctx.restore();
   });
+}
+
+function drawTokenHpBar(token, r, c) {
+  const ratio = Math.max(0, Math.min(1, (c.hp || 0) / c.maxHp));
+  const u = 1 / (curK * curMs); // one screen pixel in native units, so the bar is size-stable
+  const w = r * 1.8;
+  const h = Math.max(2 * u, 3 * u);
+  const x = token.x - w / 2;
+  const y = token.y + r + 4 * u;
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = ratio > 0.5 ? "#6fb86a" : ratio > 0.25 ? "#d6b94d" : "#d66a5f";
+  ctx.fillRect(x, y, w * ratio, h);
 }
 
 function hitToken(native) {
@@ -3308,10 +3468,119 @@ function addCombatant() {
 }
 
 function removeCombatant(id) {
+  clearCombatantLinks(id); // drop any token's link to this combatant
+  if (linkingCombatantId === id) exitLinkMode();
   state.initiative.combatants = state.initiative.combatants.filter((c) => c.id !== id);
   clampInitiativeTurn();
   updateInitiativeUI();
   broadcastState();
+}
+
+/* ---- token ↔ combatant links ---- */
+
+// The combatant-dot colors, reused so a linked token reads as the same colour as its row.
+const COMBATANT_COLORS = { player: "#6fb6f2", npc: "#c7b15a", monster: "#d66a5f" };
+
+function tokenForCombatant(id) {
+  return id ? state.tokens.find((t) => t.combatantId === id) : null;
+}
+
+// Index of the combatant whose turn it is (works on GM and player — combatants are synced).
+function currentTurnCombatantId() {
+  const init = state.initiative;
+  if (!init || !init.combatants.length) return null;
+  return sortedCombatants()[init.turn]?.id ?? null;
+}
+
+// Mirror of the order-overlay visibility: GM sees the on-map turn ring when its overlay is
+// on, the player when the order is shared with them.
+function turnRingVisible() {
+  const init = state.initiative;
+  if (!init.combatants.length) return false;
+  return isPlayer ? !!init.showPlayers : init.showOverlay !== false;
+}
+
+// Clear a combatant's link from every token, including floors that aren't currently loaded.
+function clearCombatantLinks(id) {
+  state.tokens.forEach((t) => {
+    if (t.combatantId === id) t.combatantId = null;
+  });
+  state.floors.forEach((f) =>
+    (f.tokens || []).forEach((t) => {
+      if (t.combatantId === id) t.combatantId = null;
+    }),
+  );
+}
+
+// Row link button: link mode if unlinked, locate if linked, unlink on Alt-click.
+function onInitLink(id, alt) {
+  const c = state.initiative.combatants.find((x) => x.id === id);
+  if (!c) return;
+  const token = tokenForCombatant(id);
+  if (token && alt) {
+    unlinkCombatant(id);
+    return;
+  }
+  if (token) {
+    exitLinkMode();
+    locateToken(token);
+    return;
+  }
+  if (linkingCombatantId === id) exitLinkMode();
+  else enterLinkMode(id, c.name);
+}
+
+function enterLinkMode(id, name) {
+  linkingCombatantId = id;
+  if (controls.modeHint) {
+    if (linkHintPrev === null) linkHintPrev = controls.modeHint.textContent;
+    controls.modeHint.textContent = `Linking "${name}": click a token on the map to link it (click empty space or press Esc to cancel).`;
+  }
+  canvas.style.cursor = "crosshair";
+  updateInitiativeUI();
+}
+
+function exitLinkMode() {
+  if (linkingCombatantId === null) return;
+  linkingCombatantId = null;
+  if (controls.modeHint && linkHintPrev !== null) {
+    controls.modeHint.textContent = linkHintPrev;
+    linkHintPrev = null;
+  }
+  canvas.style.cursor = "";
+  updateInitiativeUI();
+}
+
+function linkTokenToCombatant(token, combatantId) {
+  const c = state.initiative.combatants.find((x) => x.id === combatantId);
+  if (!c) return;
+  pushHistory();
+  // One token per combatant: drop any token currently linked to this combatant.
+  state.tokens.forEach((t) => {
+    if (t.combatantId === combatantId) t.combatantId = null;
+  });
+  token.combatantId = combatantId;
+  token.color = COMBATANT_COLORS[c.type] || token.color; // token reads as the row's colour
+  if (!token.label) token.label = c.name.slice(0, 3); // seed a label from the name if empty
+  renderAndSync();
+  updateInitiativeUI();
+}
+
+function unlinkCombatant(id) {
+  const token = tokenForCombatant(id);
+  if (!token) return;
+  pushHistory();
+  token.combatantId = null;
+  renderAndSync();
+  updateInitiativeUI();
+}
+
+// Center the GM view on a linked token and ping it so it's easy to spot.
+function locateToken(token) {
+  state.view.cx = token.x;
+  state.view.cy = token.y;
+  addPing(token.x, token.y, "#b1c301");
+  renderAndSyncView();
 }
 
 function adjustHp(id, delta) {
@@ -3376,10 +3645,19 @@ function renderInitiativePanel() {
   controls.initList.innerHTML = list
     .map((c, i) => {
       const pct = c.maxHp > 0 ? Math.max(0, Math.min(100, ((c.hp || 0) / c.maxHp) * 100)) : 0;
+      const linked = !!tokenForCombatant(c.id);
+      const linking = linkingCombatantId === c.id;
+      const linkState = linking ? " linking" : linked ? " linked" : "";
+      const linkTitle = linking
+        ? "Click a token on the map to link it (click again to cancel)"
+        : linked
+          ? "Locate token on the map · Alt-click to unlink"
+          : "Link this character to a token on the map";
       return `<div class="init-row${i === init.turn ? " current" : ""}" data-id="${c.id}">
         <div class="init-row-top">
           <span class="init-dot ${c.type}"></span>
           <button type="button" class="init-name" data-act="set-turn" title="Set as current turn">${escapeHtml(c.name)}</button>
+          <button type="button" class="init-link${linkState}" data-act="link" title="${linkTitle}" aria-label="${linkTitle}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><line x1="12" x2="12" y1="1" y2="4"/><line x1="12" x2="12" y1="20" y2="23"/><line x1="1" x2="4" y1="12" y2="12"/><line x1="20" x2="23" y1="12" y2="12"/></svg></button>
           <input class="init-init" type="number" data-field="init" value="${c.init}" title="Initiative">
           <button type="button" class="init-remove" data-act="remove" title="Remove" aria-label="Remove">&times;</button>
         </div>
@@ -3433,6 +3711,387 @@ function setOverlayVisible(on) {
   if (controls.initShowOverlay) controls.initShowOverlay.checked = on;
   updateInitiativeUI();
   broadcastState();
+}
+
+/* ----------------------------- music player -----------------------------
+
+The music panel runs entirely off `music` (declared near the top) and a couple of live
+HTMLAudioElements. The GM owns playback; every command is mirrored to the player window via
+`relay({ type: "music", ... })`. Audio data travels as a data URL the first time a clip is
+needed on the player (clipForWire), then the player references it by id. Audio data is never
+part of `state`, so it never bloats per-map saves or the regular sync. */
+
+const MUSIC_PLAY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+const MUSIC_PAUSE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+
+function toggleMusic() {
+  setMusicActive(!shell.classList.contains("has-music"));
+}
+
+function setMusicActive(on) {
+  shell.classList.toggle("has-music", on);
+  controls.musicToggle?.classList.toggle("active", on);
+  if (on) renderMusicPanel();
+  // The docked panel adds/removes a layout column, so the canvas must re-measure.
+  requestAnimationFrame(() => {
+    resizeCanvas();
+    render();
+  });
+}
+
+function musicFileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Build the clip payload for a "music" message: full data URL the first time the current
+// player needs this clip, then just the id afterward (tracked in playerHasClip).
+function clipForWire(id) {
+  const clip = music.library[id];
+  if (!clip) return null;
+  if (playerHasClip.has(id)) return { id };
+  playerHasClip.add(id);
+  return { id, name: clip.name, src: clip.src };
+}
+
+function relayMusic(payload) {
+  if (isPlayer) return;
+  relay({ type: "music", ...payload });
+}
+
+// --- looping beds (Music + Ambiance) -----------------------------------------
+// Both layers are identical machinery, keyed by bed name ("music" | "ambience").
+
+function loadBedFile(bed, file) {
+  musicFileToDataUrl(file).then((src) => {
+    const id = uuid();
+    music.library[id] = { id, name: file.name, src };
+    setBedClip(bed, id);
+  });
+}
+
+function setBedClip(bed, id) {
+  const b = music.beds[bed];
+  const wasPlaying = b.playing;
+  if (bedAudio[bed]) {
+    bedAudio[bed].pause();
+    bedAudio[bed] = null;
+  }
+  // Swapping the track mid-playback: silence the player's old track too (it plays its own copy).
+  if (wasPlaying) relayMusic({ action: "pause", track: bed });
+  b.id = id;
+  b.playing = false;
+  const clip = music.library[id];
+  if (clip) {
+    const audio = new Audio(clip.src);
+    audio.loop = b.loop;
+    audio.volume = b.volume;
+    audio.addEventListener("ended", () => {
+      if (!bedAudio[bed] || bedAudio[bed].loop) return;
+      b.playing = false;
+      renderMusicPanel();
+    });
+    bedAudio[bed] = audio;
+  }
+  renderMusicPanel();
+}
+
+function toggleBed(bed) {
+  const b = music.beds[bed];
+  const audio = bedAudio[bed];
+  if (!audio) return;
+  if (b.playing) {
+    audio.pause();
+    b.playing = false;
+    relayMusic({ action: "pause", track: bed });
+  } else {
+    audio.play().catch(() => {});
+    b.playing = true;
+    relayMusic({
+      action: "play",
+      track: bed,
+      clip: clipForWire(b.id),
+      loop: b.loop,
+      volume: b.volume,
+      time: audio.currentTime,
+    });
+  }
+  renderMusicPanel();
+}
+
+function setBedLoop(bed, loop) {
+  music.beds[bed].loop = loop;
+  if (bedAudio[bed]) bedAudio[bed].loop = loop;
+  relayMusic({ action: "loop", track: bed, loop });
+}
+
+function setBedVolume(bed, volume) {
+  music.beds[bed].volume = volume;
+  if (bedAudio[bed]) bedAudio[bed].volume = volume;
+  relayMusic({ action: "volume", track: bed, volume });
+}
+
+// --- SFX (one-shots) ---------------------------------------------------------
+
+function loadSfxFile(file) {
+  musicFileToDataUrl(file).then((src) => {
+    const id = uuid();
+    music.library[id] = { id, name: file.name, src };
+    music.sfxIds.push(id);
+    renderMusicPanel();
+  });
+}
+
+function playSfx(id) {
+  const clip = music.library[id];
+  if (!clip) return;
+  let audio = sfxAudioCache.get(id);
+  if (!audio) {
+    audio = new Audio(clip.src);
+    sfxAudioCache.set(id, audio);
+  }
+  audio.currentTime = 0;
+  audio.volume = music.sfxVolume;
+  audio.play().catch(() => {});
+  relayMusic({ action: "sfx", clip: clipForWire(id), volume: music.sfxVolume });
+}
+
+function removeSfx(id) {
+  music.sfxIds = music.sfxIds.filter((x) => x !== id);
+  const audio = sfxAudioCache.get(id);
+  if (audio) {
+    audio.pause();
+    sfxAudioCache.delete(id);
+  }
+  pruneLibrary();
+  renderMusicPanel();
+}
+
+// --- scenes (saved sets of both beds + SFX) ----------------------------------
+
+function saveScene() {
+  const fallback = `Scene ${music.scenes.length + 1}`;
+  const name = window.prompt("Name this scene:", fallback);
+  if (name === null) return;
+  music.scenes.push({
+    id: uuid(),
+    name: name.trim() || fallback,
+    music: { id: music.beds.music.id, loop: music.beds.music.loop },
+    ambience: { id: music.beds.ambience.id, loop: music.beds.ambience.loop },
+    sfxIds: [...music.sfxIds],
+  });
+  renderMusicPanel();
+}
+
+function loadScene(id) {
+  const scene = music.scenes.find((s) => s.id === id);
+  if (!scene) return;
+  music.currentSceneId = id;
+  music.sfxIds = [...scene.sfxIds];
+  // Each bed swaps to the scene's saved clip (paused, ready to play).
+  BED_KEYS.forEach((bed) => {
+    const saved = scene[bed] || { id: "", loop: true };
+    music.beds[bed].loop = saved.loop !== false;
+    setBedClip(bed, saved.id || "");
+  });
+  renderMusicPanel();
+}
+
+function deleteScene(id) {
+  music.scenes = music.scenes.filter((s) => s.id !== id);
+  if (music.currentSceneId === id) music.currentSceneId = "";
+  pruneLibrary();
+  renderMusicPanel();
+}
+
+// Drop any library clip no longer referenced by a bed, the SFX rack, or a scene.
+function pruneLibrary() {
+  const used = new Set();
+  BED_KEYS.forEach((bed) => {
+    if (music.beds[bed].id) used.add(music.beds[bed].id);
+  });
+  music.sfxIds.forEach((id) => used.add(id));
+  music.scenes.forEach((s) => {
+    if (s.music?.id) used.add(s.music.id);
+    if (s.ambience?.id) used.add(s.ambience.id);
+    s.sfxIds.forEach((id) => used.add(id));
+  });
+  Object.keys(music.library).forEach((id) => {
+    if (!used.has(id)) delete music.library[id];
+  });
+}
+
+function renderMusicPanel() {
+  if (isPlayer || !controls.musicPanel) return;
+  BED_KEYS.forEach((bed) => {
+    const b = music.beds[bed];
+    const c = bedControls[bed];
+    const clip = music.library[b.id];
+    if (c.name) {
+      c.name.textContent = clip ? clip.name : "empty";
+      c.name.classList.toggle("loaded", !!clip);
+    }
+    if (c.play) {
+      c.play.disabled = !clip;
+      c.play.classList.toggle("playing", b.playing);
+      c.play.innerHTML = b.playing ? MUSIC_PAUSE_ICON : MUSIC_PLAY_ICON;
+      c.play.setAttribute("aria-label", b.playing ? "Pause" : "Play");
+    }
+    if (c.loop) c.loop.checked = b.loop;
+    if (c.vol) c.vol.value = b.volume;
+  });
+  if (controls.musicSfxVol) controls.musicSfxVol.value = music.sfxVolume;
+  if (controls.musicSfxList) {
+    // Tight soundboard: each clip is a compact pad; the × shows on hover (CSS) to remove it.
+    const pads = music.sfxIds
+      .map((id) => music.library[id])
+      .filter(Boolean)
+      .map(
+        (clip) => `<div class="music-sfx-pad" data-sfx-id="${clip.id}">
+          <button class="music-sfx-trigger" data-act="play" type="button" title="${escapeHtml(clip.name)}">${escapeHtml(clip.name)}</button>
+          <button class="music-sfx-remove" data-act="del" type="button" aria-label="Remove ${escapeHtml(clip.name)}">&times;</button>
+        </div>`
+      )
+      .join("");
+    controls.musicSfxList.innerHTML = pads; // empty string collapses the board (CSS :empty)
+  }
+  if (controls.musicSceneChips) {
+    controls.musicSceneChips.innerHTML = music.scenes
+      .map(
+        (s) => `<button class="music-scene-chip${s.id === music.currentSceneId ? " active" : ""}" data-scene-id="${s.id}" type="button">${escapeHtml(s.name)}</button>`
+      )
+      .join("");
+  }
+  if (controls.musicDeleteScene) {
+    // The Delete button only lights up while a saved scene is the selected one.
+    controls.musicDeleteScene.disabled = !music.scenes.some((s) => s.id === music.currentSceneId);
+  }
+}
+
+// --- player-side mirror ------------------------------------------------------
+
+function applyMusicMessage(message) {
+  if (message.clip && message.clip.src) cacheClip(message.clip);
+  const bed = message.track; // "music" | "ambience" | "sfx"
+  switch (message.action) {
+    case "play":
+      playerPlayBed(bed, message);
+      break;
+    case "pause":
+      if (bedAudio[bed]) bedAudio[bed].pause();
+      break;
+    case "loop":
+      if (bedAudio[bed]) bedAudio[bed].loop = message.loop !== false;
+      if (music.beds[bed]) music.beds[bed].loop = message.loop !== false;
+      break;
+    case "volume":
+      if (bed === "sfx") music.sfxVolume = message.volume;
+      else if (bedAudio[bed]) bedAudio[bed].volume = message.volume;
+      break;
+    case "sfx":
+      playerPlaySfx(message);
+      break;
+    case "stop-all":
+      playerStopAll();
+      break;
+  }
+}
+
+function cacheClip(clip) {
+  music.library[clip.id] = { ...(music.library[clip.id] || {}), ...clip };
+}
+
+function playerPlayBed(bed, message) {
+  if (!music.beds[bed]) return;
+  const clipId = message.clip?.id;
+  const src = clipId ? music.library[clipId]?.src : null;
+  if (!src) return;
+  const b = music.beds[bed];
+  if (!bedAudio[bed] || b.id !== clipId) {
+    if (bedAudio[bed]) bedAudio[bed].pause();
+    bedAudio[bed] = new Audio(src);
+    b.id = clipId;
+  }
+  const audio = bedAudio[bed];
+  audio.loop = message.loop !== false;
+  audio.volume = typeof message.volume === "number" ? message.volume : 1;
+  if (typeof message.time === "number") {
+    try {
+      audio.currentTime = message.time;
+    } catch {}
+  }
+  const p = audio.play();
+  if (p && p.catch) {
+    p.catch(() => {
+      // Autoplay blocked until the display gets a user gesture; remember and prompt.
+      pendingPlayerMusic = { bed, message };
+      showAudioUnlock();
+    });
+  }
+}
+
+function playerPlaySfx(message) {
+  const clipId = message.clip?.id;
+  const src = clipId ? music.library[clipId]?.src : null;
+  if (!src) return;
+  let audio = sfxAudioCache.get(clipId);
+  if (!audio) {
+    audio = new Audio(src);
+    sfxAudioCache.set(clipId, audio);
+  }
+  audio.currentTime = 0;
+  audio.volume = typeof message.volume === "number" ? message.volume : 1;
+  const p = audio.play();
+  if (p && p.catch) p.catch(() => showAudioUnlock());
+}
+
+function playerStopAll() {
+  BED_KEYS.forEach((bed) => bedAudio[bed] && bedAudio[bed].pause());
+  sfxAudioCache.forEach((a) => a.pause());
+}
+
+// Player display: browsers block audio until a gesture in the window. Show a one-time
+// prompt; clicking it unlocks playback and replays whatever was waiting.
+function showAudioUnlock() {
+  if (!isPlayer || audioUnlocked) return;
+  if (document.getElementById("audioUnlock")) return;
+  const btn = document.createElement("button");
+  btn.id = "audioUnlock";
+  btn.className = "audio-unlock";
+  btn.type = "button";
+  btn.innerHTML = "<span>&#128266; Click to enable table audio</span>";
+  btn.addEventListener("click", () => {
+    audioUnlocked = true;
+    btn.remove();
+    if (pendingPlayerMusic) {
+      playerPlayBed(pendingPlayerMusic.bed, pendingPlayerMusic.message);
+      pendingPlayerMusic = null;
+    }
+  });
+  document.body.appendChild(btn);
+}
+
+// GM: a fresh player just connected — bring its audio up to the current bed playback state.
+function resyncMusicToPlayer() {
+  if (isPlayer) return;
+  relayMusic({ action: "volume", track: "sfx", volume: music.sfxVolume });
+  BED_KEYS.forEach((bed) => {
+    const b = music.beds[bed];
+    if (b.playing && b.id) {
+      relayMusic({
+        action: "play",
+        track: bed,
+        clip: clipForWire(b.id),
+        loop: b.loop,
+        volume: b.volume,
+        time: bedAudio[bed] ? bedAudio[bed].currentTime : 0,
+      });
+    }
+  });
 }
 
 /* ----------------------------- ping / measure ----------------------------- */
@@ -3753,6 +4412,14 @@ function onPointerDown(event) {
 
   if (event.altKey) {
     triggerPing(native);
+    return;
+  }
+
+  // Initiative link mode: the next token click binds that token to the chosen combatant.
+  if (linkingCombatantId) {
+    const target = hitToken(native);
+    if (target) linkTokenToCombatant(target, linkingCombatantId);
+    exitLinkMode();
     return;
   }
 
@@ -4188,7 +4855,16 @@ function onKeyDown(event) {
     closeFogRibbon();
     return;
   }
+  if (event.key === "Escape" && linkingCombatantId) {
+    exitLinkMode();
+    return;
+  }
   if (event.target?.matches?.("input, button, textarea, select")) return;
+
+  if (event.key === "?") {
+    openShortcuts();
+    return;
+  }
 
   const drawingPolygon = mode === "polygon" || mode === "namedPolygon";
   const ctrl = event.ctrlKey || event.metaKey;

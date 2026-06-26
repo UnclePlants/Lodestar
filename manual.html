@@ -142,6 +142,7 @@
     <li><a href="#aoe">Area of effect</a></li>
     <li><a href="#measure">Measure &amp; ping</a></li>
     <li><a href="#initiative">Initiative tracker</a></li>
+    <li><a href="#music">Music &amp; sound</a></li>
     <li><a href="#rotate">Rotating &amp; the player frame</a></li>
     <li><a href="#irl">In-person play on a TV</a></li>
     <li><a href="#floors">Floors, stairs, splash</a></li>
@@ -278,10 +279,28 @@
     <li>The <strong>GM</strong> toggle shows it on your screen; the <strong>Players</strong> toggle mirrors it to the player display.</li>
     <li>It stays visible even when the full panel is retracted, and has its own <strong>‹ / ›</strong> arrows to move through the round without reopening the panel.</li>
   </ul>
+  <h3>Link a character to its token</h3>
+  <p>Each row has a small <strong>crosshair</strong> button that ties the character to a token on the map:</p>
+  <ul>
+    <li>Click the crosshair, then click a token on the map to link them. The token takes on the row's colour and a short label from the name.</li>
+    <li>Once linked, the crosshair lights up — click it again to <strong>locate</strong> that token (the view centres on it and it pings). <strong>Alt-click</strong> the crosshair to unlink.</li>
+    <li>The token of whoever's turn it is wears a glowing <strong>turn ring</strong> on the battlefield, so the table can see who's acting at a glance. The ring follows the same Players toggle as the order overlay.</li>
+  </ul>
   <figure>
     <img src="manual/initiative.png" alt="The docked initiative panel with several combatants and HP bars, plus the compact order overlay in the corner.">
     <figcaption><b>Figure 9.</b> The initiative panel and the compact corner overlay.</figcaption>
   </figure>
+</section>
+
+<section id="music">
+  <h2 class="sec">Music &amp; sound <a class="top" href="#about">↑ top</a></h2>
+  <p>Open the music panel from its toolbar button (the musical-notes icon). It docks above the initiative tracker on the right and runs three layers that all play together: a looping <strong>Music</strong> track, a looping <strong>Ambiance</strong> bed underneath it, and one-shot <strong>SFX</strong> stings on top.</p>
+  <ul>
+    <li><strong>Music &amp; Ambiance.</strong> Each is an independent looping layer — load a clip with the download-arrow button, then play / pause it. Run a soundtrack on the Music layer and an environment loop (rain, tavern, wind) on the Ambiance layer at the same time. Leave <strong>Loop</strong> on for beds or off for a single play-through, and each layer has its own volume slider.</li>
+    <li><strong>SFX.</strong> Load one or more clips and they appear as a tight grid of <strong>soundboard pads</strong> — click a pad to fire that effect as a one-shot over the beds. They share one volume slider. Hover a pad and a small <strong>×</strong> appears in its corner to remove it.</li>
+    <li><strong>Scenes.</strong> Once the layers are loaded the way you like, press <strong>+ Scene</strong> to save that whole mix (both beds and the SFX set) under a name. Click a scene chip to recall it instantly (the beds swap in paused, ready to play). To remove one, select its chip and use the <strong>Delete</strong> button at the top of the panel — it only lights up once a scene is selected, so you can't delete one by accident.</li>
+  </ul>
+  <p>Everything is mirrored to the player display, so the table hears it too. Because browsers block audio until the window has been clicked, the first time a track starts the player display shows a one-time <strong>“Click to enable table audio”</strong> button — click it once and audio flows from then on. Loaded audio lives in this browser tab only; it is not bundled into saved maps.</p>
 </section>
 
 <section id="rotate">
@@ -332,6 +351,7 @@
 
 <section id="keys">
   <h2 class="sec">Keyboard shortcuts <a class="top" href="#about">↑ top</a></h2>
+  <p>You don't have to memorise these — press <kbd>?</kbd> or click the <strong>?</strong> button in the toolbar to pop the same cheatsheet up inside the app at any time.</p>
   <table class="keys">
     <tr><td><kbd>V</kbd></td><td>Move / select</td></tr>
     <tr><td><kbd>P</kbd> · <kbd>N</kbd></td><td>Polygon fog · Named fog area</td></tr>
