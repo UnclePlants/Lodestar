@@ -183,10 +183,10 @@ button:hover {
 
 .app-shell {
   display: grid;
-  /* Three columns always: left controls, stage, initiative. The initiative track is 0
-     when inactive and the left track is 0 when collapsed, so both panels animate open/shut
-     by transitioning the track widths. */
-  grid-template-columns: 320px minmax(0, 1fr) 0px;
+  /* Three columns always: left controls, stage, right panels. The right track is 0 when no
+     panel is active (or it's retracted), and the left track is 0 when collapsed, so panels
+     animate open/shut by transitioning the track widths. Left and right tracks match width. */
+  grid-template-columns: 300px minmax(0, 1fr) 0px;
   height: 100vh;
   transition: grid-template-columns 0.28s ease;
   width: 100vw;
@@ -194,7 +194,7 @@ button:hover {
 
 .app-shell.has-initiative,
 .app-shell.has-music {
-  grid-template-columns: 320px minmax(0, 1fr) 300px;
+  grid-template-columns: 300px minmax(0, 1fr) 300px;
 }
 
 .app-shell.panel-collapsed {
@@ -204,6 +204,18 @@ button:hover {
 .app-shell.panel-collapsed.has-initiative,
 .app-shell.panel-collapsed.has-music {
   grid-template-columns: 0px minmax(0, 1fr) 300px;
+}
+
+/* The right retract tab collapses the entire right column (music + initiative together),
+   regardless of which panel is active. */
+.app-shell.right-collapsed.has-initiative,
+.app-shell.right-collapsed.has-music {
+  grid-template-columns: 300px minmax(0, 1fr) 0px;
+}
+
+.app-shell.right-collapsed.panel-collapsed.has-initiative,
+.app-shell.right-collapsed.panel-collapsed.has-music {
+  grid-template-columns: 0px minmax(0, 1fr) 0px;
 }
 
 .app-shell[data-role="player"] {
@@ -681,7 +693,8 @@ input:disabled {
   right: 0;
 }
 
-/* Points "open" (left) while the right panels are closed; "closed" (right) when open. */
+/* Points "open" (left) while the right panels are closed or retracted; "closed" (right) when open. */
+.app-shell.right-collapsed .panel-toggle-right svg,
 .app-shell:not(.has-initiative):not(.has-music) .panel-toggle-right svg {
   transform: rotate(180deg);
 }
@@ -695,7 +708,7 @@ input:disabled {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  left: 14px;
+  left: 30px;
   position: absolute;
   top: 14px;
   z-index: 6;
@@ -2026,6 +2039,12 @@ input:disabled {
   z-index: 6;
 }
 
+/* On the GM screen the help button sits in the bottom-left corner, so lift the order
+   overlay above it. (The button is hidden on the player display.) */
+.app-shell[data-role="gm"] .initiative-overlay {
+  bottom: 62px;
+}
+
 .init-ov-round {
   color: var(--accent);
   font-size: 0.78rem;
@@ -2111,4 +2130,359 @@ input:disabled {
   color: var(--muted);
   font-size: 0.78rem;
   font-style: normal;
+}
+
+/* ----------------------------- panel subsection ----------------------------- */
+.subsection-title {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-top: 14px;
+}
+
+.subsection-title h3 {
+  font-size: 0.9rem;
+  font-weight: 650;
+  margin: 0;
+}
+
+/* ----------------------------- floating help button ----------------------------- */
+.shortcuts-fab {
+  align-items: center;
+  background: rgba(6, 2, 28, 0.82);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  bottom: 16px;
+  color: var(--text);
+  display: flex;
+  height: 38px;
+  justify-content: center;
+  left: 16px;
+  padding: 0;
+  position: absolute;
+  width: 38px;
+  z-index: 6;
+}
+
+.shortcuts-fab:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.shortcuts-fab svg {
+  fill: none;
+  height: 20px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 20px;
+}
+
+.app-shell[data-role="player"] .shortcuts-fab {
+  display: none;
+}
+
+.dialog-head-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.dialog-manual-link {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 0.82rem;
+  padding: 6px 10px;
+  text-decoration: none;
+}
+
+.dialog-manual-link:hover {
+  border-color: var(--accent);
+}
+
+/* ----------------------------- GM rich-text notes ----------------------------- */
+#noteLayer {
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  z-index: 4;
+}
+
+.app-shell[data-role="player"] #noteLayer,
+.app-shell[data-role="player"] #imageHandles,
+.app-shell[data-role="player"] #pdfLayer {
+  display: none;
+}
+
+/* The note is sized in native px and the layer scales it with the map (transform set in JS). */
+.map-note {
+  background: #f4e8c1;
+  border: 1px solid #b59f63;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  color: #14110a;
+  font-family: Georgia, serif;
+  pointer-events: auto;
+  position: absolute;
+  transform-origin: top left;
+  top: 0;
+  left: 0;
+}
+
+.map-note-grip {
+  align-items: center;
+  background: #e6d6a6;
+  border-bottom: 1px solid #c8b576;
+  border-radius: 4px 4px 0 0;
+  cursor: move;
+  display: flex;
+  justify-content: space-between;
+  padding: 1px 4px;
+}
+
+.map-note-dots {
+  color: #8a7b4d;
+  font-weight: 700;
+  letter-spacing: 2px;
+  line-height: 1;
+}
+
+.map-note-del {
+  background: none;
+  border: 0;
+  color: #8a5a4d;
+  cursor: pointer;
+  font-size: 1.1em;
+  line-height: 1;
+  min-height: 0;
+  padding: 0 2px;
+}
+
+.map-note-del:hover {
+  color: #b3382b;
+}
+
+.map-note-body {
+  min-height: 1.6em;
+  outline: none;
+  padding: 5px 7px;
+  word-break: break-word;
+}
+
+.map-note-resize {
+  bottom: 0;
+  cursor: nwse-resize;
+  height: 14px;
+  position: absolute;
+  right: 0;
+  width: 14px;
+}
+
+.map-note-resize::after {
+  border-right: 2px solid #9c8a55;
+  border-bottom: 2px solid #9c8a55;
+  bottom: 3px;
+  content: "";
+  height: 6px;
+  position: absolute;
+  right: 3px;
+  width: 6px;
+}
+
+.note-format-bar {
+  align-items: center;
+  background: #06021c;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  position: absolute;
+  z-index: 7;
+}
+
+.note-format-bar select,
+.note-format-bar button {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.78rem;
+  min-height: 26px;
+  padding: 0 6px;
+}
+
+.note-format-bar button {
+  min-width: 26px;
+}
+
+.note-format-bar button:hover,
+.note-format-bar select:hover {
+  border-color: var(--accent);
+}
+
+/* ----------------------------- selected-image handles ----------------------------- */
+#imageHandles {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 5;
+}
+
+.img-handle {
+  background: #fff;
+  border: 2px solid var(--accent);
+  border-radius: 2px;
+  height: 12px;
+  margin: -7px 0 0 -7px;
+  pointer-events: auto;
+  position: absolute;
+  width: 12px;
+}
+
+.img-handle[data-corner="nw"],
+.img-handle[data-corner="se"] {
+  cursor: nwse-resize;
+}
+
+.img-handle[data-corner="ne"],
+.img-handle[data-corner="sw"] {
+  cursor: nesw-resize;
+}
+
+.img-rot-stem {
+  background: var(--accent);
+  height: 26px;
+  margin-left: -1px;
+  pointer-events: none;
+  position: absolute;
+  transform-origin: top center;
+  width: 2px;
+}
+
+.img-rot-ball {
+  background: var(--accent);
+  border: 2px solid #06021c;
+  border-radius: 50%;
+  cursor: grab;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  min-height: 0;
+  padding: 0;
+  pointer-events: auto;
+  position: absolute;
+  width: 16px;
+}
+
+.img-show-players {
+  align-items: center;
+  background: rgba(6, 2, 28, 0.88);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font-size: 0.76rem;
+  gap: 5px;
+  padding: 4px 8px;
+  pointer-events: auto;
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* ----------------------------- DM PDF windows ----------------------------- */
+#pdfLayer {
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 8;
+}
+
+.pdf-window {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  height: 540px;
+  overflow: hidden;
+  pointer-events: auto;
+  position: absolute;
+  width: 420px;
+}
+
+.pdf-head {
+  align-items: center;
+  background: #06021c;
+  border-bottom: 1px solid var(--line);
+  cursor: move;
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.pdf-title {
+  color: var(--text);
+  flex: 1;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-head button {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.76rem;
+  min-height: 26px;
+  padding: 0 8px;
+}
+
+.pdf-head .pdf-close {
+  font-size: 1rem;
+  min-width: 28px;
+  padding: 0;
+}
+
+.pdf-head button:hover {
+  border-color: var(--accent);
+}
+
+.pdf-frame {
+  background: #fff;
+  border: 0;
+  flex: 1;
+  width: 100%;
+}
+
+.pdf-resize {
+  bottom: 0;
+  cursor: nwse-resize;
+  height: 16px;
+  position: absolute;
+  right: 0;
+  width: 16px;
+}
+
+.pdf-resize::after {
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  bottom: 4px;
+  content: "";
+  height: 7px;
+  position: absolute;
+  right: 4px;
+  width: 7px;
 }
