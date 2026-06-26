@@ -302,6 +302,9 @@
               <button id="initToggle" class="tool-button" type="button" title="Initiative tracker" aria-label="Initiative tracker">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
               </button>
+              <button id="musicToggle" class="tool-button" type="button" title="Music player" aria-label="Music player">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              </button>
               <button id="fitMapBtn" class="tool-button" type="button" title="Fit to screen (F)" aria-label="Fit to screen">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" x2="14" y1="3" y2="10"/><line x1="3" x2="10" y1="21" y2="14"/></svg>
               </button>
@@ -310,6 +313,9 @@
               </button>
               <button id="redoBtn" class="tool-button" type="button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5 5.5 5.5 0 0 0 9.5 20H13"/></svg>
+              </button>
+              <button id="shortcutsBtn" class="tool-button" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
               </button>
             </div>
             <div class="fog-ribbon hidden" id="fogRibbon" role="toolbar" aria-label="Fog of war tools">
@@ -500,6 +506,56 @@
         </div>
       </section>
 
+      <div class="right-panels" id="rightPanels">
+      <aside class="music-panel" id="musicPanel" aria-label="Music player">
+        <div class="music-head">
+          <h2>Music</h2>
+          <button id="musicDeleteScene" type="button" class="music-delete-scene" disabled title="Delete the selected scene" aria-label="Delete the selected scene">Delete</button>
+        </div>
+        <div class="music-scenes">
+          <div id="musicSceneChips" class="music-scene-chips"></div>
+          <button id="musicAddScene" type="button" class="music-add-scene">+ Scene</button>
+        </div>
+        <div class="music-bed">
+          <div class="music-bed-row">
+            <button id="musicTrackPlay" type="button" class="music-play-btn" disabled aria-label="Play music">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            <span class="music-bed-info"><strong>Music</strong><span id="musicTrackName" class="music-track-name">empty</span></span>
+            <label class="music-loop" title="Loop this track"><input id="musicTrackLoop" type="checkbox" checked><span>loop</span></label>
+            <button id="musicTrackLoad" type="button" class="mini-btn" title="Load music track" aria-label="Load music track">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            </button>
+          </div>
+          <input id="musicTrackVol" class="music-vol" type="range" min="0" max="1" step="0.05" value="0.7" title="Music volume" aria-label="Music volume">
+        </div>
+        <div class="music-bed">
+          <div class="music-bed-row">
+            <button id="musicAmbiencePlay" type="button" class="music-play-btn" disabled aria-label="Play ambiance">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            <span class="music-bed-info"><strong>Ambiance</strong><span id="musicAmbienceName" class="music-track-name">empty</span></span>
+            <label class="music-loop" title="Loop this track"><input id="musicAmbienceLoop" type="checkbox" checked><span>loop</span></label>
+            <button id="musicAmbienceLoad" type="button" class="mini-btn" title="Load ambiance loop" aria-label="Load ambiance loop">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            </button>
+          </div>
+          <input id="musicAmbienceVol" class="music-vol" type="range" min="0" max="1" step="0.05" value="0.7" title="Ambiance volume" aria-label="Ambiance volume">
+        </div>
+        <div class="music-bed music-sfx">
+          <div class="music-bed-row">
+            <span class="music-bed-info"><strong>SFX</strong></span>
+            <input id="musicSfxVol" class="music-vol music-vol-inline" type="range" min="0" max="1" step="0.05" value="1" title="SFX volume" aria-label="SFX volume">
+            <button id="musicSfxLoad" type="button" class="mini-btn" title="Add SFX files" aria-label="Add SFX files">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            </button>
+          </div>
+          <div id="musicSfxList" class="music-sfx-list"></div>
+        </div>
+        <input id="musicTrackFile" type="file" accept="audio/*" hidden>
+        <input id="musicAmbienceFile" type="file" accept="audio/*" hidden>
+        <input id="musicSfxFile" type="file" accept="audio/*" multiple hidden>
+      </aside>
       <aside class="initiative-panel" id="initiativePanel" aria-label="Initiative tracker">
         <div class="init-head">
           <h2>Initiative</h2>
@@ -543,6 +599,7 @@
           <button type="submit">Add character</button>
         </form>
       </aside>
+      </div><!-- .right-panels -->
     </main>
 
     <dialog id="libraryDialog" class="library-dialog">
@@ -580,6 +637,62 @@
         <div class="name-dialog-actions">
           <button value="place" type="submit" class="save-btn">Place</button>
           <button value="cancel" type="submit">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="shortcutsDialog" class="shortcuts-dialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <h2>Keyboard &amp; mouse</h2>
+          <button value="cancel" type="submit">Close</button>
+        </div>
+        <div class="shortcuts-grid">
+          <section class="sc-group">
+            <h3>Tools</h3>
+            <div class="sc-row"><kbd>V</kbd><span>Move / select</span></div>
+            <div class="sc-row"><kbd>T</kbd><span>Token</span></div>
+            <div class="sc-row"><kbd>A</kbd><span>Area of effect</span></div>
+            <div class="sc-row"><kbd>M</kbd><span>Measure</span></div>
+            <div class="sc-row"><kbd>S</kbd><span>Stairs</span></div>
+          </section>
+          <section class="sc-group">
+            <h3>Fog tools</h3>
+            <div class="sc-row"><kbd>P</kbd><span>Fog area</span></div>
+            <div class="sc-row"><kbd>N</kbd><span>Named fog area</span></div>
+            <div class="sc-row"><kbd>B</kbd><span>Paint fog</span></div>
+            <div class="sc-row"><kbd>E</kbd><span>Erase fog</span></div>
+            <div class="sc-row"><kbd>[</kbd> <kbd>]</kbd><span>Brush size</span></div>
+          </section>
+          <section class="sc-group">
+            <h3>View</h3>
+            <div class="sc-row"><kbd>F</kbd><span>Fit to screen</span></div>
+            <div class="sc-row"><kbd>+</kbd> <kbd>&minus;</kbd><span>Zoom in / out</span></div>
+            <div class="sc-row"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd><span>Pan the map</span></div>
+            <div class="sc-row"><span class="sc-mouse">Wheel</span><span>Zoom</span></div>
+            <div class="sc-row"><span class="sc-mouse">Middle-drag</span><span>Pan (any tool)</span></div>
+          </section>
+          <section class="sc-group">
+            <h3>Editing</h3>
+            <div class="sc-row"><kbd>Ctrl</kbd>+<kbd>Z</kbd><span>Undo</span></div>
+            <div class="sc-row"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd><span>Redo</span></div>
+            <div class="sc-row"><kbd>Del</kbd><span>Delete selected</span></div>
+            <div class="sc-row"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd><span>Nudge selected token</span></div>
+          </section>
+          <section class="sc-group">
+            <h3>Mouse</h3>
+            <div class="sc-row"><span class="sc-mouse">Drag</span><span>Move token / pan map</span></div>
+            <div class="sc-row"><span class="sc-mouse">Alt+click</span><span>Ping a spot</span></div>
+            <div class="sc-row"><span class="sc-mouse">Right-click</span><span>Remove under cursor</span></div>
+            <div class="sc-row"><span class="sc-mouse">Double-click</span><span>Edit AoE / note label</span></div>
+          </section>
+          <section class="sc-group">
+            <h3>Fog drawing</h3>
+            <div class="sc-row"><span class="sc-mouse">Click</span><span>Drop a corner</span></div>
+            <div class="sc-row"><kbd>Enter</kbd><span>Finish the area</span></div>
+            <div class="sc-row"><kbd>Ctrl</kbd>+<kbd>Z</kbd><span>Undo last corner</span></div>
+            <div class="sc-row"><kbd>Esc</kbd><span>Cancel the shape</span></div>
+          </section>
         </div>
       </form>
     </dialog>

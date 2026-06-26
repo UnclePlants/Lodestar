@@ -192,7 +192,8 @@ button:hover {
   width: 100vw;
 }
 
-.app-shell.has-initiative {
+.app-shell.has-initiative,
+.app-shell.has-music {
   grid-template-columns: 320px minmax(0, 1fr) 300px;
 }
 
@@ -200,7 +201,8 @@ button:hover {
   grid-template-columns: 0px minmax(0, 1fr) 0px;
 }
 
-.app-shell.panel-collapsed.has-initiative {
+.app-shell.panel-collapsed.has-initiative,
+.app-shell.panel-collapsed.has-music {
   grid-template-columns: 0px minmax(0, 1fr) 300px;
 }
 
@@ -679,8 +681,8 @@ input:disabled {
   right: 0;
 }
 
-/* Points "open" (left) while the initiative panel is closed; "closed" (right) when open. */
-.app-shell:not(.has-initiative) .panel-toggle-right svg {
+/* Points "open" (left) while the right panels are closed; "closed" (right) when open. */
+.app-shell:not(.has-initiative):not(.has-music) .panel-toggle-right svg {
   transform: rotate(180deg);
 }
 
@@ -1240,6 +1242,80 @@ input:disabled {
   display: block;
 }
 
+/* ----------------------------- shortcuts cheatsheet ----------------------------- */
+.shortcuts-dialog {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 0;
+  width: min(94vw, 680px);
+}
+
+.shortcuts-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.shortcuts-dialog form {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 18px;
+}
+
+.shortcuts-grid {
+  display: grid;
+  gap: 18px 24px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.sc-group h3 {
+  color: var(--accent);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
+.sc-row {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.84rem;
+  gap: 6px;
+  min-height: 26px;
+}
+
+.sc-row span:last-child {
+  margin-left: auto;
+  text-align: right;
+}
+
+.sc-row kbd {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  min-width: 18px;
+  padding: 4px 6px;
+  text-align: center;
+}
+
+.sc-mouse {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 0.72rem;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
 .saved-map-row span {
   color: var(--muted);
   font-size: 0.78rem;
@@ -1270,19 +1346,15 @@ input:disabled {
     order: 1;
   }
 
-  .app-shell.has-initiative {
+  .app-shell.has-initiative,
+  .app-shell.has-music {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(280px, 45vh) 1fr auto;
   }
 
-  .initiative-panel {
+  .right-panels {
     order: 3;
-  }
-
-  /* Stacked layout: hide the initiative panel entirely until it's activated, and the
-     left-collapse affordance doesn't apply, so keep the panel visible. */
-  .app-shell:not(.has-initiative) .initiative-panel {
-    display: none;
+    flex-direction: column;
   }
 
   .app-shell.panel-collapsed .gm-panel {
@@ -1294,13 +1366,28 @@ input:disabled {
   }
 }
 
-/* ----------------------------- initiative tracker ----------------------------- */
-.initiative-panel {
-  background: #06021c;
+/* ----------------------------- right panel column ----------------------------- */
+.right-panels {
   border-left: 1px solid var(--line);
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* The player display never shows the GM's right panels. */
+.app-shell[data-role="player"] .right-panels {
+  display: none;
+}
+
+/* ----------------------------- initiative tracker ----------------------------- */
+.initiative-panel {
+  background: #06021c;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   gap: 12px;
+  min-height: 0;
   min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -1308,8 +1395,7 @@ input:disabled {
   scrollbar-gutter: stable;
 }
 
-/* The player display never shows the GM's docked initiative panel. */
-.app-shell[data-role="player"] .initiative-panel {
+.app-shell:not(.has-initiative) .initiative-panel {
   display: none;
 }
 
@@ -1434,6 +1520,55 @@ input:disabled {
   width: 42px;
 }
 
+/* Locate/link button: ties a combatant to a map token. Dim when unlinked, accent when
+   linked, and a pulsing accent while waiting for the token click. */
+.init-link {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  display: flex;
+  flex-shrink: 0;
+  justify-content: center;
+  min-height: 0;
+  padding: 0 2px;
+}
+
+.init-link svg {
+  fill: none;
+  height: 15px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 15px;
+}
+
+.init-link:hover {
+  background: none;
+  border: 0;
+  color: var(--text);
+}
+
+.init-link.linked {
+  color: var(--accent);
+}
+
+.init-link.linking {
+  color: var(--accent);
+  animation: init-link-pulse 1s ease-in-out infinite;
+}
+
+@keyframes init-link-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .init-remove {
   background: none;
   border: 0;
@@ -1527,6 +1662,351 @@ input:disabled {
   border-color: transparent;
   color: #1b1508;
   font-weight: 700;
+}
+
+/* ----------------------------- music panel ----------------------------- */
+.music-panel {
+  background: #06021c;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 8px;
+  max-height: 48vh;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 12px 14px;
+}
+
+.app-shell:not(.has-music) .music-panel {
+  display: none;
+}
+
+.music-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.music-head h2 {
+  flex: 1;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* Dimmed until a scene chip is selected, then lights up red so deletes are deliberate. */
+.music-delete-scene {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  min-height: 24px;
+  padding: 0 10px;
+}
+
+.music-delete-scene:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.music-delete-scene:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.music-delete-scene:not(:disabled):hover {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  border-color: var(--danger);
+}
+
+.music-scenes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.music-scene-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.music-scene-chip {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  min-height: 0;
+  padding: 3px 10px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.music-scene-chip.active {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.music-scene-chip:hover:not(.active) {
+  border-color: var(--muted);
+}
+
+.music-add-scene {
+  background: none;
+  border: 1px dashed var(--line);
+  border-radius: 20px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 3px 10px;
+}
+
+.music-add-scene:hover {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
+/* A bed (Music / Ambiance / SFX) is two tight rows: a control line + a slim volume slider. */
+.music-bed {
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+}
+
+.music-bed-row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Layer label + loaded track name, sharing one truncating line. */
+.music-bed-info {
+  align-items: baseline;
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.music-bed-info strong {
+  flex-shrink: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* In the SFX row the label is short, so let the inline volume slider take the slack. */
+.music-sfx .music-bed-info {
+  flex: 0 0 auto;
+}
+
+.music-track-name {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-track-name.loaded {
+  color: var(--text);
+}
+
+/* Compact loop toggle: a checkbox with a tiny caption, no chrome. */
+.music-loop {
+  align-items: center;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  gap: 3px;
+}
+
+.music-loop input {
+  height: 13px;
+  margin: 0;
+  width: 13px;
+}
+
+.mini-btn {
+  align-items: center;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  flex-shrink: 0;
+  height: 24px;
+  justify-content: center;
+  padding: 0 5px;
+  width: 24px;
+}
+
+.mini-btn svg {
+  fill: none;
+  height: 13px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 13px;
+}
+
+.mini-btn:hover {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
+/* Slim volume slider — bare, no "Volume" label row. */
+.music-vol {
+  accent-color: var(--accent);
+  height: 14px;
+  width: 100%;
+}
+
+.music-vol-inline {
+  flex: 1;
+  min-width: 0;
+}
+
+.music-play-btn {
+  align-items: center;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  flex-shrink: 0;
+  height: 26px;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  transition: border-color 0.15s;
+  width: 26px;
+}
+
+.music-play-btn svg {
+  fill: currentColor;
+  height: 11px;
+  stroke: none;
+  width: 11px;
+}
+
+.music-play-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.music-play-btn:not(:disabled):hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.music-play-btn.playing {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Tight soundboard: pads wrap into a compact grid so many SFX fit at a glance. */
+.music-sfx-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 96px;
+  overflow-y: auto;
+}
+
+.music-sfx-list:empty {
+  display: none;
+}
+
+.music-sfx-pad {
+  position: relative;
+}
+
+.music-sfx-trigger {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  max-width: 120px;
+  min-height: 24px;
+  overflow: hidden;
+  padding: 0 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-sfx-trigger:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.music-sfx-trigger:active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* × tucked into the pad's top-right corner, revealed only on hover. */
+.music-sfx-remove {
+  align-items: center;
+  background: var(--danger);
+  border: 1px solid #06021c;
+  border-radius: 50%;
+  color: #1b1508;
+  cursor: pointer;
+  display: none;
+  font-size: 0.7rem;
+  height: 16px;
+  justify-content: center;
+  line-height: 1;
+  min-height: 0;
+  padding: 0;
+  position: absolute;
+  right: -5px;
+  top: -5px;
+  width: 16px;
+}
+
+.music-sfx-pad:hover .music-sfx-remove {
+  display: flex;
+}
+
+.music-sfx-remove:hover {
+  filter: brightness(1.1);
+}
+
+/* Player display: one-time "enable audio" prompt shown when the browser blocks autoplay. */
+.audio-unlock {
+  background: rgba(6, 2, 28, 0.92);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  bottom: 24px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1rem;
+  left: 50%;
+  padding: 14px 26px;
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 50;
+}
+
+.audio-unlock:hover {
+  background: rgba(6, 2, 28, 1);
+  border-color: var(--accent);
 }
 
 /* Floating turn-order overlay on the map (GM always; player when shared). */
