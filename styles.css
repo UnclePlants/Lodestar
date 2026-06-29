@@ -116,23 +116,27 @@ button:hover {
   filter: brightness(1.08);
 }
 
-.start-manual {
-  align-items: center;
-  animation: start-rise 0.7s ease 0.7s both;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  color: var(--muted);
+/* Demo button + the hand-drawn "Try it now" arrow pointing at its top-left corner. */
+.start-demo-wrap {
   display: inline-flex;
-  font-size: 0.95rem;
-  letter-spacing: 0.04em;
-  min-height: 44px;
-  padding: 0 36px;
-  text-decoration: none;
+  position: relative;
 }
 
-.start-manual:hover {
-  border-color: var(--accent-2);
-  color: var(--text);
+.start-demo-wrap .start-enter {
+  animation-delay: 0.7s;
+}
+
+.start-demo-arrow {
+  height: auto;
+  pointer-events: none;
+  position: absolute;
+  width: 240px;
+  /* The arrowhead tip sits ~92% across / ~66% down the SVG, i.e. ~222px right / ~92px down
+     at this width; offsetting by that lands the tip on the button's top-left corner.
+     Nudge `left`/`top` to fine-tune. */
+  left: -222px;
+  top: -92px;
+  animation: start-rise 0.7s ease 0.9s both;
 }
 
 .start-credit {
@@ -147,6 +151,24 @@ button:hover {
   position: absolute;
   right: 0;
   text-align: center;
+}
+
+.start-credits-btn {
+  animation: start-fade 0.9s ease 0.9s both;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  bottom: 18px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 8px 16px;
+  position: absolute;
+  right: 24px;
+}
+
+.start-credits-btn:hover {
+  border-color: var(--accent-2);
+  color: var(--text);
 }
 
 @keyframes start-rise {
@@ -1329,6 +1351,56 @@ input:disabled {
   white-space: nowrap;
 }
 
+/* ----------------------------- credits dialog ----------------------------- */
+.credits-dialog {
+  width: min(94vw, 560px);
+}
+
+.credits-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.credits-group h3 {
+  color: var(--accent);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.credits-group p,
+.credits-group ul {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.credits-group ul {
+  padding-left: 18px;
+}
+
+.credits-group li {
+  margin: 3px 0;
+}
+
+.credits-group strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.credits-group a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.credits-group a:hover {
+  text-decoration: underline;
+}
+
 .saved-map-row span {
   color: var(--muted);
   font-size: 0.78rem;
@@ -2183,6 +2255,32 @@ input:disabled {
 }
 
 .app-shell[data-role="player"] .shortcuts-fab {
+  display: none;
+}
+
+/* Demo-map credit + support link, bottom-center of the map (GM only). */
+.map-credit-link {
+  background: rgba(6, 2, 28, 0.82);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  bottom: 14px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  left: 50%;
+  padding: 6px 12px;
+  position: absolute;
+  text-decoration: none;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 6;
+}
+
+.map-credit-link:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.app-shell[data-role="player"] .map-credit-link {
   display: none;
 }
 

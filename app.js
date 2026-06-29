@@ -459,13 +459,91 @@ function setupStartScreen() {
     window.removeEventListener("keydown", onStartKey);
   };
   const onStartKey = (event) => {
+    if (document.getElementById("creditsDialog")?.open) return; // let the open dialog handle keys
     if (event.key === "Enter" || event.key === "Escape" || event.key === " ") {
       event.preventDefault();
       dismiss();
     }
   };
   document.getElementById("startEnter")?.addEventListener("click", dismiss);
+  document.getElementById("startDemo")?.addEventListener("click", (event) => loadDemoMap(event.currentTarget, dismiss));
+  document.getElementById("startCredits")?.addEventListener("click", () => document.getElementById("creditsDialog")?.showModal());
   window.addEventListener("keydown", onStartKey);
+}
+
+// Demo: load the bundled sample library (a Fantasy Atlas map) and reveal the app. The data
+// is a 16 MB JS file pulled in via a <script> tag on click — that loads on file:// too (where
+// fetch() of a local file is blocked) and only downloads when the Demo button is pressed.
+function loadDemoMap(btn, dismiss) {
+  const original = btn ? btn.textContent : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Loading…";
+  }
+  const fail = (msg) => {
+    window.alert(`Could not load the demo map: ${msg}`);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  };
+  const apply = () => {
+    try {
+      const data = window.__LODESTAR_DEMO__;
+      const map = (data && data.maps) ? data.maps[0] : null;
+      if (!map) throw new Error("the demo data has no map");
+      const snapshot = validateSessionData({ app: map.app || data.app, version: map.version || data.version, state: map.state });
+      drawingRoom = [];
+      activeStroke = null;
+      undoStack.length = 0;
+      redoStack.length = 0;
+      updateUndoButtons();
+      loadSnapshot(snapshot);
+      syncControlsFromState();
+      broadcastAssets();
+      renderAndSync();
+      loadDemoMusic(); // preload + start the CC-BY demo track
+      if (dismiss) dismiss();
+    } catch (e) {
+      fail(e.message);
+    }
+  };
+  if (window.__LODESTAR_DEMO__) {
+    apply();
+    return;
+  }
+  const tag = document.createElement("script");
+  tag.src = "demo-map.js";
+  tag.onload = apply;
+  tag.onerror = () => fail("could not load the demo data");
+  document.head.appendChild(tag);
+}
+
+// Preload the bundled demo audio into the two looping beds plus the SFX rack, and open the
+// music panel so it's all loaded and ready. Nothing auto-plays — the GM presses play. Clips
+// are credited in CREDITS.md and carry attribution in their names; file URLs are used directly
+// so this works on file:// too.
+const DEMO_BEDS = [
+  { bed: "music", name: "Invented Rooms — Savfk (CC BY 4.0)", src: "demo-music.mp3" },
+  { bed: "ambience", name: "Creepy Ambiance — Pixabay", src: "demo-ambiance.mp3" },
+];
+const DEMO_SFX = [{ name: "Loud Explosion — Pixabay", src: "demo-explosion.mp3" }];
+
+function loadDemoMusic() {
+  if (isPlayer) return;
+  DEMO_BEDS.forEach(({ bed, name, src }) => {
+    const id = uuid();
+    music.library[id] = { id, name, src };
+    setBedClip(bed, id);
+  });
+  DEMO_SFX.forEach(({ name, src }) => {
+    const id = uuid();
+    music.library[id] = { id, name, src };
+    music.sfxIds.push(id); // appears as a soundboard pad (one-shot)
+  });
+  music.sfxVolume = 0.25; // the explosion is loud — start the demo's SFX at 25%
+  relayMusic({ action: "volume", track: "sfx", volume: music.sfxVolume });
+  setMusicActive(true); // show the music panel with the demo tracks loaded, paused
 }
 
 // Make each GM panel section collapsible: a caret in the title toggles a slide-down
