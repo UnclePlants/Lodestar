@@ -25,9 +25,14 @@
         <p class="start-tagline">A battlemap display tool for game masters.</p>
         <div class="start-actions">
           <button id="startEnter" class="start-enter" type="button">Enter</button>
+          <div class="start-demo-wrap">
+            <img class="start-demo-arrow" src="try-it-now.svg" alt="Try it now" aria-hidden="true">
+            <button id="startDemo" class="start-enter" type="button">Demo</button>
+          </div>
         </div>
       </div>
       <p class="start-credit">made by u/UnclePlants</p>
+      <button id="startCredits" class="start-credits-btn" type="button">Credits</button>
     </div>
     <main class="app-shell" data-role="gm">
       <aside class="gm-panel" aria-label="Game master controls">
@@ -524,6 +529,8 @@
         <button id="shortcutsBtn" class="shortcuts-fab" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
         </button>
+        <!-- Credit + support link for the demo map creator, bottom-center of the map (GM only). -->
+        <a class="map-credit-link" href="https://www.patreon.com/c/Fantasy_Atlas/home" target="_blank" rel="noopener">Demo map by Fantasy Atlas ↗</a>
       </section>
 
       <div class="right-panels" id="rightPanels">
@@ -715,6 +722,40 @@
             <div class="sc-row"><kbd>Enter</kbd><span>Finish the area</span></div>
             <div class="sc-row"><kbd>Ctrl</kbd>+<kbd>Z</kbd><span>Undo last corner</span></div>
             <div class="sc-row"><kbd>Esc</kbd><span>Cancel the shape</span></div>
+          </section>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="creditsDialog" class="shortcuts-dialog credits-dialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <h2>Credits</h2>
+          <button value="cancel" type="submit">Close</button>
+        </div>
+        <div class="credits-body">
+          <section class="credits-group">
+            <h3>Demo map</h3>
+            <p><strong>Tearooms</strong> by <strong>Fantasy Atlas</strong> — <a href="https://www.patreon.com/c/Fantasy_Atlas/home" target="_blank" rel="noopener">support on Patreon ↗</a></p>
+          </section>
+          <section class="credits-group">
+            <h3>Audio</h3>
+            <ul>
+              <li>“Invented Rooms” by <strong>Savfk</strong> — <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · <a href="https://breakingcopyright.com/song/savfk-invented-rooms" target="_blank" rel="noopener">source ↗</a></li>
+              <li>“Creepy Ambiance” by <strong>freesound_community</strong> — <a href="https://pixabay.com/service/license-summary/" target="_blank" rel="noopener">Pixabay ↗</a></li>
+              <li>“Loud Explosion” by <strong>DRAGON-STUDIO</strong> — <a href="https://pixabay.com/service/license-summary/" target="_blank" rel="noopener">Pixabay ↗</a></li>
+            </ul>
+          </section>
+          <section class="credits-group">
+            <h3>Icons</h3>
+            <ul>
+              <li><strong>Lucide</strong> — <a href="https://lucide.dev" target="_blank" rel="noopener">lucide.dev ↗</a> (ISC / MIT)</li>
+              <li><strong>Tabler Icons</strong> — <a href="https://tabler.io/icons" target="_blank" rel="noopener">tabler.io ↗</a> (MIT)</li>
+            </ul>
+          </section>
+          <section class="credits-group">
+            <h3>Feature ideas, from Reddit</h3>
+            <p>Thanks to u/Odd_Maybe2168, u/D3XR, u/Plebian_Donkey_Konga, u/DungeonDadofDadJokes, u/DerekT0341, u/Tommyruin, and u/FaceDeer for ideas that shaped Lodestar.</p>
           </section>
         </div>
       </form>

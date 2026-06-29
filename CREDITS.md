@@ -20,6 +20,10 @@ resolutions.
 Thanks to **u/Plebian_Donkey_Konga** on Reddit for suggesting undo/redo (`Ctrl+Z`), middle-mouse
 drag to pan the map in any tool, and the drag-to-draw fog-of-war shapes.
 
+Thanks to **u/DungeonDadofDadJokes** (music/SFX player and PDF reader), **u/DerekT0341** and
+**u/Tommyruin** (tying tokens to the initiative tracker), and **u/FaceDeer** (the in-app
+shortcut overlay) on Reddit, whose suggestions shaped the v1.2.0 features.
+
 ---
 
 ## Lucide
@@ -95,3 +99,40 @@ tool. It is credited here in accordance with its license.
 - Creator: **Elven Tower Adventures** — https://elventower.com
 - License: **CC BY 4.0** — https://creativecommons.org/licenses/by/4.0/
 - Changes: displayed in Lodestar with a fog-of-war overlay added.
+
+---
+
+## Bundled demo content
+
+The in-app **Demo** button loads a sample map plus music, ambiance, and an SFX,
+all bundled in this repository (`demo-map.js`, `demo-music.mp3`,
+`demo-ambiance.mp3`, `demo-explosion.mp3`).
+
+### Map
+
+- Map: **"Tearooms"** by **Fantasy Atlas**
+- Creator / support: https://www.patreon.com/c/Fantasy_Atlas/home
+- Bundled as Lodestar's demo map, credited in-app with a link to support the creator.
+
+### Music
+
+- Track: **"Invented Rooms"** by **Savfk**
+- Artist: https://www.savfk.com
+- Source: https://breakingcopyright.com/song/savfk-invented-rooms
+- Promoted by: https://www.breakingcopyright.com
+- License: **CC BY 4.0** — https://creativecommons.org/licenses/by/4.0/
+- Changes: none; played as-is in the demo's music player.
+
+### Ambiance
+
+- Sound: **"Creepy Ambiance"** by **freesound_community**
+- Source: Pixabay — https://pixabay.com
+- License: **Pixabay Content License** — https://pixabay.com/service/license-summary/
+- Changes: none; looped as the ambiance layer in the demo's music player.
+
+### Sound effect
+
+- Sound: **"Loud Explosion"** by **DRAGON-STUDIO**
+- Source: Pixabay — https://pixabay.com
+- License: **Pixabay Content License** — https://pixabay.com/service/license-summary/
+- Changes: none; a one-shot pad in the demo's SFX soundboard.
