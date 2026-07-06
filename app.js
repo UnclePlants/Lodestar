@@ -466,31 +466,80 @@ function setupStartScreen() {
     }
   };
   document.getElementById("startEnter")?.addEventListener("click", dismiss);
-  document.getElementById("startDemo")?.addEventListener("click", (event) => loadDemoMap(event.currentTarget, dismiss));
+  const demoBtn = document.getElementById("startDemo");
+  // Warm the 17 MB demo bundle the moment the GM shows intent (hover/focus), so the
+  // actual click feels near-instant instead of a long "Loading" wait.
+  demoBtn?.addEventListener("pointerenter", prefetchDemo, { once: true });
+  demoBtn?.addEventListener("focus", prefetchDemo, { once: true });
+  demoBtn?.addEventListener("click", (event) => loadDemoMap(event.currentTarget, dismiss));
   document.getElementById("startCredits")?.addEventListener("click", () => document.getElementById("creditsDialog")?.showModal());
   window.addEventListener("keydown", onStartKey);
 }
 
 // Demo: load the bundled sample library (a Fantasy Atlas map) and reveal the app. The data
-// is a 16 MB JS file pulled in via a <script> tag on click — that loads on file:// too (where
-// fetch() of a local file is blocked) and only downloads when the Demo button is pressed.
+// is a 16 MB JS file pulled in via a <script> tag — that loads on file:// too (where fetch()
+// of a local file is blocked) — and only downloads on demo intent (hover or click).
+let demoDataPromise = null;
+
+function ensureDemoData() {
+  if (window.__LODESTAR_DEMO__) return Promise.resolve();
+  if (!demoDataPromise) {
+    demoDataPromise = new Promise((resolve, reject) => {
+      const tag = document.createElement("script");
+      tag.src = "demo-map.js";
+      tag.onload = resolve;
+      tag.onerror = () => {
+        tag.remove();
+        demoDataPromise = null; // let a later click retry the download
+        reject(new Error("could not load the demo data"));
+      };
+      document.head.appendChild(tag);
+    });
+  }
+  return demoDataPromise;
+}
+
+// Hover intent: start the map download and hint the browser at the audio files, so the
+// eventual click has (most of) the work already done. Errors surface on click, not here.
+function prefetchDemo() {
+  ensureDemoData().catch(() => {});
+  ["demo-music.mp3", "demo-ambiance.mp3", "demo-explosion.mp3"].forEach((href) => {
+    const link = document.createElement("link");
+    link.rel = "prefetch";
+    link.href = href;
+    document.head.appendChild(link);
+  });
+}
+
+// Resolves once the current map image is decoded and drawable, capped at `capMs` so a
+// decode hiccup can never strand the start screen.
+function whenMapReady(capMs) {
+  const img = mapImage;
+  if (!img || !img.src) return Promise.resolve();
+  const decoded = img.decode ? img.decode().catch(() => {}) : Promise.resolve();
+  const cap = new Promise((resolve) => setTimeout(resolve, capMs));
+  return Promise.race([decoded, cap]);
+}
+
 function loadDemoMap(btn, dismiss) {
   const original = btn ? btn.textContent : "";
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "Loading…";
+    btn.classList.add("is-loading");
+    btn.textContent = "Loading";
   }
   const fail = (msg) => {
     window.alert(`Could not load the demo map: ${msg}`);
     if (btn) {
       btn.disabled = false;
+      btn.classList.remove("is-loading");
       btn.textContent = original;
     }
   };
-  const apply = () => {
-    try {
+  ensureDemoData()
+    .then(() => {
       const data = window.__LODESTAR_DEMO__;
-      const map = (data && data.maps) ? data.maps[0] : null;
+      const map = data && data.maps ? data.maps[0] : null;
       if (!map) throw new Error("the demo data has no map");
       const snapshot = validateSessionData({ app: map.app || data.app, version: map.version || data.version, state: map.state });
       drawingRoom = [];
@@ -502,21 +551,17 @@ function loadDemoMap(btn, dismiss) {
       syncControlsFromState();
       broadcastAssets();
       renderAndSync();
-      loadDemoMusic(); // preload + start the CC-BY demo track
+      shell.classList.add("is-demo"); // enables the demo-only Fantasy Atlas credit
+      loadDemoMusic(); // demo audio, loaded paused
+      // Hold the start screen until the map image is actually decoded, so the fade-out
+      // reveals a finished battlemap instead of a black stage.
+      return whenMapReady(4000);
+    })
+    .then(() => {
+      render();
       if (dismiss) dismiss();
-    } catch (e) {
-      fail(e.message);
-    }
-  };
-  if (window.__LODESTAR_DEMO__) {
-    apply();
-    return;
-  }
-  const tag = document.createElement("script");
-  tag.src = "demo-map.js";
-  tag.onload = apply;
-  tag.onerror = () => fail("could not load the demo data");
-  document.head.appendChild(tag);
+    })
+    .catch((e) => fail(e && e.message ? e.message : String(e)));
 }
 
 // Preload the bundled demo audio into the two looping beds plus the SFX rack, and open the
@@ -1012,6 +1057,7 @@ function loadMapFile(event) {
   const reader = new FileReader();
   reader.onerror = () => window.alert("Could not read that image file.");
   reader.onload = () => {
+    shell.classList.remove("is-demo"); // your own map: drop the demo-map credit
     state.imageData = reader.result;
     state.imageName = file.name;
     state.imageId = uuid();
@@ -1206,6 +1252,7 @@ async function loadLibraryMap(id) {
   try {
     const data = await getMapRecord(id);
     const snapshot = validateSessionData(data);
+    shell.classList.remove("is-demo"); // a library map is not the demo
     drawingRoom = [];
     activeStroke = null;
     undoStack.length = 0;

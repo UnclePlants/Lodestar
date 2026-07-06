@@ -116,6 +116,28 @@ button:hover {
   filter: brightness(1.08);
 }
 
+/* Animated ellipsis while the demo bundle downloads ("Loading", "Loading.", …). */
+.start-enter.is-loading {
+  cursor: progress;
+}
+
+.start-enter.is-loading::after {
+  animation: loading-dots 1.2s steps(4, jump-none) infinite;
+  content: "...";
+  display: inline-block;
+  overflow: hidden;
+  text-align: left;
+  vertical-align: bottom;
+  white-space: nowrap;
+  width: 0;
+}
+
+@keyframes loading-dots {
+  to {
+    width: 1.05em;
+  }
+}
+
 /* Demo button + the hand-drawn "Try it now" arrow pointing at its top-left corner. */
 .start-demo-wrap {
   display: inline-flex;
@@ -2258,13 +2280,19 @@ input:disabled {
   display: none;
 }
 
-/* Demo-map credit + support link, bottom-center of the map (GM only). */
+/* Demo-map credit + support link, bottom-center of the map. Only shown while the bundled
+   demo map is loaded (`.is-demo`), never for the GM's own maps or on the player display. */
 .map-credit-link {
+  display: none;
+}
+
+.app-shell.is-demo .map-credit-link {
   background: rgba(6, 2, 28, 0.82);
   border: 1px solid var(--line);
   border-radius: 8px;
   bottom: 14px;
   color: var(--muted);
+  display: block;
   font-size: 0.78rem;
   left: 50%;
   padding: 6px 12px;
