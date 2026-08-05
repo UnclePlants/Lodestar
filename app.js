@@ -4165,7 +4165,7 @@ function renderInitiativePanel() {
           <span class="init-dot ${c.type}"></span>
           <button type="button" class="init-name" data-act="set-turn" title="Set as current turn">${escapeHtml(c.name)}</button>
           <button type="button" class="init-link${linkState}" data-act="link" title="${linkTitle}" aria-label="${linkTitle}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><line x1="12" x2="12" y1="1" y2="4"/><line x1="12" x2="12" y1="20" y2="23"/><line x1="1" x2="4" y1="12" y2="12"/><line x1="20" x2="23" y1="12" y2="12"/></svg></button>
-          <button type="button" class="init-conc${c.concentration ? " active" : ""}" data-act="toggle-conc" title="Concentration" aria-label="Concentration">K</button>
+          <button type="button" class="init-conc${c.concentration ? " active" : ""}" data-act="toggle-conc" title="Concentration" aria-label="Concentration" aria-pressed="${!!c.concentration}">K</button>
           <input class="init-init" type="number" data-field="init" value="${c.init}" title="Initiative">
           <button type="button" class="init-remove" data-act="remove" title="Remove" aria-label="Remove">&times;</button>
         </div>
@@ -4198,7 +4198,7 @@ function renderInitiativeOverlay() {
   const rows = list
     .map((c, i) => {
       const hp = !isPlayer && c.hp != null ? ` <em>${c.hp}${c.maxHp != null ? `/${c.maxHp}` : ""}</em>` : "";
-      const conc = c.concentration ? `<span class="init-conc-badge">K</span>` : "";
+      const conc = c.concentration ? `<span class="init-conc-badge" title="Concentration" aria-label="Concentration">K</span>` : "";
       return `<li class="${i === init.turn ? "current" : ""}"><span class="init-dot ${c.type}"></span><span class="init-ov-name">${escapeHtml(c.name)}</span>${conc}${hp}</li>`;
     })
     .join("");
