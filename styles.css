@@ -2243,6 +2243,16 @@ input:disabled {
   white-space: nowrap;
 }
 
+.init-conc-badge {
+  background: var(--accent);
+  border-radius: 4px;
+  color: #1b1508;
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 5px;
+}
+
 .initiative-overlay em {
   color: var(--muted);
   font-size: 0.78rem;

@@ -4198,7 +4198,8 @@ function renderInitiativeOverlay() {
   const rows = list
     .map((c, i) => {
       const hp = !isPlayer && c.hp != null ? ` <em>${c.hp}${c.maxHp != null ? `/${c.maxHp}` : ""}</em>` : "";
-      return `<li class="${i === init.turn ? "current" : ""}"><span class="init-dot ${c.type}"></span><span class="init-ov-name">${escapeHtml(c.name)}</span>${hp}</li>`;
+      const conc = c.concentration ? `<span class="init-conc-badge">K</span>` : "";
+      return `<li class="${i === init.turn ? "current" : ""}"><span class="init-dot ${c.type}"></span><span class="init-ov-name">${escapeHtml(c.name)}</span>${conc}${hp}</li>`;
     })
     .join("");
   // GM gets turn arrows + a hide button in the header; the player just sees the round label.
