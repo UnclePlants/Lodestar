@@ -1692,6 +1692,29 @@ input:disabled {
   color: var(--danger);
 }
 
+.init-conc {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--muted);
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  min-height: 0;
+  padding: 2px 6px;
+}
+
+.init-conc:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.init-conc.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1b1508;
+}
+
 .init-hp-line {
   align-items: center;
   display: flex;
