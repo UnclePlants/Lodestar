@@ -2967,13 +2967,18 @@ function placeAoeMarker(native) {
 // Cancelling the prompt keeps the draft intact so the user can retry Enter/dbl-click.
 function finishAoeLine() {
   if (aoeLineDraft.length < 2) return;
+  // A double-click's second press fires its own pointerdown (adding a point at basically the
+  // same spot) before the dblclick event that calls this function — collapse any resulting
+  // consecutive duplicate points so double-click-to-finish doesn't leave a stray extra vertex.
+  const points = aoeLineDraft.filter((point, i) => i === 0 || point.x !== aoeLineDraft[i - 1].x || point.y !== aoeLineDraft[i - 1].y);
+  if (points.length < 2) return;
   const label = window.prompt("Label for this area (GM-only, optional):", "");
   if (label === null) return; // cancelled — draft stays as-is
   pushHistory();
   const marker = {
     id: uuid(),
     shape: "line",
-    points: aoeLineDraft.map((point) => ({ ...point })),
+    points: points.map((point) => ({ ...point })),
     sizeFt: aoeSizeFt,
     color: aoeColor,
     label: label.trim(),
