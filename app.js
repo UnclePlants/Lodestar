@@ -878,6 +878,7 @@ function bindControls() {
     else if (event.target.closest("[data-act='hp-up']")) adjustHp(id, 1);
     else if (event.target.closest("[data-act='link']")) onInitLink(id, event.altKey);
     else if (event.target.closest("[data-act='set-turn']")) setTurnToId(id);
+    else if (event.target.closest("[data-act='toggle-conc']")) toggleConcentration(id);
   });
   controls.initList?.addEventListener("change", (event) => {
     const row = event.target.closest("[data-id]");
@@ -3952,7 +3953,7 @@ function addCombatant() {
   const init = Number(controls.initRoll.value) || 0;
   const hp = controls.initHp.value === "" ? null : Math.max(0, Number(controls.initHp.value) || 0);
   const type = controls.initType.value || "player";
-  state.initiative.combatants.push({ id: uuid(), name, type, init, hp, maxHp: hp });
+  state.initiative.combatants.push({ id: uuid(), name, type, init, hp, maxHp: hp, concentration: false });
   controls.initName.value = "";
   controls.initRoll.value = "";
   controls.initHp.value = "";
@@ -4090,6 +4091,14 @@ function adjustHp(id, delta) {
   broadcastState();
 }
 
+function toggleConcentration(id) {
+  const c = state.initiative.combatants.find((x) => x.id === id);
+  if (!c) return;
+  c.concentration = !c.concentration;
+  updateInitiativeUI();
+  broadcastState();
+}
+
 function setTurnToId(id) {
   const idx = sortedCombatants().findIndex((c) => c.id === id);
   if (idx >= 0) {
@@ -4156,6 +4165,7 @@ function renderInitiativePanel() {
           <span class="init-dot ${c.type}"></span>
           <button type="button" class="init-name" data-act="set-turn" title="Set as current turn">${escapeHtml(c.name)}</button>
           <button type="button" class="init-link${linkState}" data-act="link" title="${linkTitle}" aria-label="${linkTitle}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><line x1="12" x2="12" y1="1" y2="4"/><line x1="12" x2="12" y1="20" y2="23"/><line x1="1" x2="4" y1="12" y2="12"/><line x1="20" x2="23" y1="12" y2="12"/></svg></button>
+          <button type="button" class="init-conc${c.concentration ? " active" : ""}" data-act="toggle-conc" title="Concentration" aria-label="Concentration" aria-pressed="${!!c.concentration}">C</button>
           <input class="init-init" type="number" data-field="init" value="${c.init}" title="Initiative">
           <button type="button" class="init-remove" data-act="remove" title="Remove" aria-label="Remove">&times;</button>
         </div>
@@ -4188,7 +4198,8 @@ function renderInitiativeOverlay() {
   const rows = list
     .map((c, i) => {
       const hp = !isPlayer && c.hp != null ? ` <em>${c.hp}${c.maxHp != null ? `/${c.maxHp}` : ""}</em>` : "";
-      return `<li class="${i === init.turn ? "current" : ""}"><span class="init-dot ${c.type}"></span><span class="init-ov-name">${escapeHtml(c.name)}</span>${hp}</li>`;
+      const conc = c.concentration ? `<span class="init-conc-badge" title="Concentration" aria-label="Concentration">C</span>` : "";
+      return `<li class="${i === init.turn ? "current" : ""}"><span class="init-dot ${c.type}"></span><span class="init-ov-name">${escapeHtml(c.name)}</span>${conc}${hp}</li>`;
     })
     .join("");
   // GM gets turn arrows + a hide button in the header; the player just sees the round label.
