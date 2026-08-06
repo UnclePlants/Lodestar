@@ -94,6 +94,7 @@ const controls = {
   aoeCircle: document.getElementById("aoeCircle"),
   aoeSquare: document.getElementById("aoeSquare"),
   aoeCone: document.getElementById("aoeCone"),
+  aoeLine: document.getElementById("aoeLine"),
   aoeColor: document.getElementById("aoeColor"),
   aoePresetsRow: document.getElementById("aoePresetsRow"),
   aoeCustomSize: document.getElementById("aoeCustomSize"),
@@ -322,7 +323,8 @@ let aoeSizeFt = 10; // size in feet (radius for circle, side for square, length 
 let aoeAngle = -Math.PI / 2; // cone direction (radians); default points "up"
 let aoeTemplate = { visible: false, x: 0, y: 0 }; // GM: cursor pos · player: full received template
 let aoeSyncQueued = false;
-const AOE_PRESETS = { circle: [5, 10, 15, 20], square: [10, 20, 30], cone: [15, 30] };
+let aoeLineDraft = []; // native points of the in-progress line, cleared on finish/cancel/shape switch
+const AOE_PRESETS = { circle: [5, 10, 15, 20], square: [10, 20, 30], cone: [15, 30], line: [1, 5, 10] };
 const AOE_CONE_HALF_ANGLE = Math.atan(0.5); // ~26.6°, total spread ≈ 53° (D&D cone)
 let selectedToken = null; // token highlighted in Move mode for arrow-key nudging (GM only)
 let selectedImage = null; // map image selected in Move mode (GM only)
@@ -813,6 +815,7 @@ function bindControls() {
   controls.aoeCircle?.addEventListener("click", () => setAoeShape("circle"));
   controls.aoeSquare?.addEventListener("click", () => setAoeShape("square"));
   controls.aoeCone?.addEventListener("click", () => setAoeShape("cone"));
+  controls.aoeLine?.addEventListener("click", () => setAoeShape("line"));
   controls.aoeColor?.addEventListener("input", () => {
     aoeColor = controls.aoeColor.value;
     render();
@@ -1903,6 +1906,9 @@ function toggleFogRibbon() {
   controls.fogRibbon?.classList.toggle("hidden");
 }
 
+const AOE_HINT_DEFAULT = "Hover to preview. Click to drop a persistent AoE marker (prompts for label). Right-click a marker to remove it. Double-click a marker to edit its label. Mouse wheel rotates the cone.";
+const AOE_HINT_LINE = "Click each point of the line. Enter or double-click to place it (2+ points, prompts for a label). Ctrl+Z/Backspace removes the last point, Escape cancels the draft. Right-click a placed line to remove it.";
+
 function setMode(nextMode) {
   exitLinkMode(); // leaving link mode if a tool is picked mid-link (restores the hint first)
   if (mode === "aoe" && nextMode !== "aoe") {
@@ -1931,11 +1937,12 @@ function setMode(nextMode) {
     eraser: "Drag over fog to erase brush/bucket fog. Right-click a polygon to clear its area.",
     stamp: "Drag to draw a fog shape. Right-click an area to remove it.",
     token: "Click to drop a token, drag to move it, right-click to remove it.",
-    aoe: "Hover to preview. Click to drop a persistent AoE marker (prompts for label). Right-click a marker to remove it. Double-click a marker to edit its label. Mouse wheel rotates the cone.",
+    aoe: AOE_HINT_DEFAULT,
     measure: "Drag to measure distance across the grid.",
     stair: "Click to place a staircase. Right-click a stair to remove it.",
     note: "Click the map to drop a note (GM-only). Type to edit; use the bar above it to format. Drag the title strip to move, drag the corner to resize.",
   }[nextMode] ?? "";
+  if (nextMode === "aoe" && aoeShape === "line") controls.modeHint.textContent = AOE_HINT_LINE;
 
   // Shared fog-options popover: shown for all fog tools, with tool-specific rows toggled.
   const showFogOptions = FOG_TOOL_MODES.includes(nextMode);
@@ -2838,13 +2845,16 @@ function drawAoeTemplate() {
 
 function setAoeShape(shape) {
   aoeShape = shape;
+  aoeLineDraft = []; // abandon any in-progress line when switching shapes
   [
     ["circle", controls.aoeCircle],
     ["square", controls.aoeSquare],
     ["cone", controls.aoeCone],
+    ["line", controls.aoeLine],
   ].forEach(([name, btn]) => btn?.classList.toggle("active", shape === name));
   updateAoePresets();
   controls.aoeAngleRow?.classList.toggle("hidden", shape !== "cone");
+  if (mode === "aoe") controls.modeHint.textContent = shape === "line" ? AOE_HINT_LINE : AOE_HINT_DEFAULT;
 }
 
 // Size in native px for a placed AoE marker (radius, half-side, or cone length).
@@ -4965,6 +4975,7 @@ function onPointerDown(event) {
 
   if (mode === "aoe") {
     if (!state.imageData) return;
+    if (aoeShape === "line") return; // drafting logic lands in Task 2
     placeAoeMarker(toNativePoint(event));
     return;
   }
