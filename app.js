@@ -2897,6 +2897,22 @@ function aoePxSize(m) {
   return m.sizeFt * measureCellWorld() / FEET_PER_CELL / (state.map.scale || 1);
 }
 
+// Shortest distance from point p to the segment a–b (native coords).
+function distanceToSegment(p, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  let t = lenSq ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+// Label-anchor point for a line marker: the centroid of its vertices.
+function aoeLineCentroid(points) {
+  const sum = points.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+  return { x: sum.x / points.length, y: sum.y / points.length };
+}
+
 // Hit-test a native point against all placed AoE markers (reverse order = top first).
 function hitAoeMarker(native) {
   const list = state.aoeMarkers || [];
@@ -2918,6 +2934,10 @@ function hitAoeMarker(native) {
         { x: m.x + Math.cos(a2) * size, y: m.y + Math.sin(a2) * size },
       ];
       if (pointInPolygon(native, pts)) return m;
+    } else if (m.shape === "line") {
+      for (let j = 0; j < m.points.length - 1; j++) {
+        if (distanceToSegment(native, m.points[j], m.points[j + 1]) <= size / 2) return m;
+      }
     }
   }
   return null;
@@ -3037,7 +3057,8 @@ function drawAoeMarkerLabels() {
   list.forEach((m) => {
     if (!m.label) return;
     const size = aoePxSize(m);
-    const center = nativeToScreen({ x: m.x, y: m.y - size * 0.15 });
+    const anchor = m.shape === "line" ? aoeLineCentroid(m.points) : { x: m.x, y: m.y };
+    const center = nativeToScreen({ x: anchor.x, y: anchor.y - size * 0.15 });
     const tw = ctx.measureText(m.label).width;
     const pad = 5;
     const bw = tw + pad * 2;
