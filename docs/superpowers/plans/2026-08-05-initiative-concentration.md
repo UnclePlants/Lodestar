@@ -1,8 +1,8 @@
-# Initiative "Concentration" (K) Toggle Implementation Plan
+# Initiative "Concentration" (C) Toggle Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a GM-clickable "K" (concentration) toggle to each Initiative combatant row, mirrored as a read-only badge to both the GM and player-visible turn-order overlay.
+**Goal:** Add a GM-clickable "C" (concentration) toggle to each Initiative combatant row, mirrored as a read-only badge to both the GM and player-visible turn-order overlay.
 
 **Architecture:** Lodestar is a single-file vanilla-JS app (`app.js` + `styles.css` + `index.html`, no build step, no dependencies, no test framework — see `README.md`). GM and player are the same code running in two windows, distinguished by the `isPlayer` flag, kept in sync by `broadcastState()` → `BroadcastChannel`/`postMessage` → `loadSnapshot()`. This feature adds one boolean field to the combatant data shape and rides that existing sync path — no new message type, no build tooling, no automated tests (none exist in this repo; verification is manual, in-browser, matching how every other feature here is checked).
 
@@ -53,7 +53,7 @@ function toggleConcentration(id) {
 }
 ```
 
-- [ ] **Step 3: Add the K button to the GM row markup**
+- [ ] **Step 3: Add the C button to the GM row markup**
 
 In `app.js`, inside `renderInitiativePanel()`, the row-top template (lines 4155-4161) currently reads:
 
@@ -74,7 +74,7 @@ Insert a new button between the `.init-link` button and the `.init-init` input:
           <span class="init-dot ${c.type}"></span>
           <button type="button" class="init-name" data-act="set-turn" title="Set as current turn">${escapeHtml(c.name)}</button>
           <button type="button" class="init-link${linkState}" data-act="link" title="${linkTitle}" aria-label="${linkTitle}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><line x1="12" x2="12" y1="1" y2="4"/><line x1="12" x2="12" y1="20" y2="23"/><line x1="1" x2="4" y1="12" y2="12"/><line x1="20" x2="23" y1="12" y2="12"/></svg></button>
-          <button type="button" class="init-conc${c.concentration ? " active" : ""}" data-act="toggle-conc" title="Concentration" aria-label="Concentration">K</button>
+          <button type="button" class="init-conc${c.concentration ? " active" : ""}" data-act="toggle-conc" title="Concentration" aria-label="Concentration">C</button>
           <input class="init-init" type="number" data-field="init" value="${c.init}" title="Initiative">
           <button type="button" class="init-remove" data-act="remove" title="Remove" aria-label="Remove">&times;</button>
         </div>
@@ -147,16 +147,16 @@ In `styles.css`, immediately after the `.init-remove:hover` rule (ends line 1693
 - [ ] **Step 6: Manual verification**
 
 Open `index.html` directly in a browser (no server needed). Open the Initiative panel, add a combatant. Confirm:
-1. A "K" button appears between the link icon and the initiative-number input.
+1. A "C" button appears between the link icon and the initiative-number input.
 2. Clicking it toggles a visibly highlighted (olive/accent-colored) background on/off, with no page reload or console errors (check DevTools console).
-3. Toggling HP (`−`/`+`) or advancing the turn does **not** clear the K state — it stays independently on/off.
+3. Toggling HP (`−`/`+`) or advancing the turn does **not** clear the C state — it stays independently on/off.
 4. Reload the page — combatant list is fresh (in-memory only, expected) — no crash on empty state.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add app.js styles.css
-git commit -m "feat: add GM concentration (K) toggle to initiative rows"
+git commit -m "feat: add GM concentration (C) toggle to initiative rows"
 ```
 
 ---
@@ -190,7 +190,7 @@ Change it to add a conditional badge right after the name span:
   const rows = list
     .map((c, i) => {
       const hp = !isPlayer && c.hp != null ? ` <em>${c.hp}${c.maxHp != null ? `/${c.maxHp}` : ""}</em>` : "";
-      const conc = c.concentration ? `<span class="init-conc-badge">K</span>` : "";
+      const conc = c.concentration ? `<span class="init-conc-badge">C</span>` : "";
       return `<li class="${i === init.turn ? "current" : ""}"><span class="init-dot ${c.type}"></span><span class="init-ov-name">${escapeHtml(c.name)}</span>${conc}${hp}</li>`;
     })
     .join("");
@@ -219,14 +219,14 @@ In `styles.css`, immediately after `.initiative-overlay .init-ov-name` (ends lin
 1. Open `index.html` as the GM window.
 2. Open a second browser tab/window at the same path with `?view=player` appended (e.g. `index.html?view=player`) — this is the existing player-view mechanism (`isPlayer` flag, `app.js:238`).
 3. In the GM window, turn on Initiative, add a combatant, and turn on the "Players" overlay toggle (`showPlayers`) so the overlay is visible on both screens.
-4. In the GM window's initiative panel, click that combatant's K button.
-5. Confirm: a small "K" badge appears next to the combatant's name in **both** the GM overlay and the player-view overlay, within a moment (no manual refresh).
-6. Click K again — confirm the badge disappears from both windows.
+4. In the GM window's initiative panel, click that combatant's C button.
+5. Confirm: a small "C" badge appears next to the combatant's name in **both** the GM overlay and the player-view overlay, within a moment (no manual refresh).
+6. Click C again — confirm the badge disappears from both windows.
 7. Check both windows' DevTools consoles for errors during the toggle.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add app.js styles.css
-git commit -m "feat: mirror concentration (K) badge to initiative overlay"
+git commit -m "feat: mirror concentration (C) badge to initiative overlay"
 ```

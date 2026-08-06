@@ -1,4 +1,4 @@
-# Initiative "Concentration" (K) Toggle — Design
+# Initiative "Concentration" (C) Toggle — Design
 
 **Date:** 2026-08-05
 **Status:** Approved
@@ -20,7 +20,7 @@ concentration: boolean // default false
 `renderInitiativePanel()` (app.js:4132) — add a new button per row, placed immediately after the name/link button:
 
 ```html
-<button type="button" class="init-conc" data-act="toggle-conc" data-id="{combatant.id}" title="Concentration" aria-label="Concentration">K</button>
+<button type="button" class="init-conc" data-act="toggle-conc" data-id="{combatant.id}" title="Concentration" aria-label="Concentration">C</button>
 ```
 
 - Active state (`combatant.concentration === true`) → apply `.active` class, giving the button a highlighted (blue) background.
@@ -43,7 +43,7 @@ Toggle is a plain on/off flip. No auto-clear on HP loss or any other trigger —
 `renderInitiativeOverlay()` (app.js:4177) — visible to both GM and players. For each combatant where `concentration === true`, render a small non-interactive badge next to their name:
 
 ```html
-<span class="init-conc-badge">K</span>
+<span class="init-conc-badge">C</span>
 ```
 
 - Omitted entirely when `concentration` is false — no placeholder/empty state shown.
