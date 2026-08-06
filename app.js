@@ -1918,6 +1918,7 @@ function setMode(nextMode) {
   mode = nextMode;
   closeFogRibbon();
   drawingRoom = [];
+  aoeLineDraft = [];
   stampDraft = null;
   selectedToken = null;
   selectedImage = selectedNote = selectedAoeMarker = null;
@@ -2387,6 +2388,7 @@ function render() {
   if (!isPlayer) drawRoomOutlines();
   if (!isPlayer) drawStairs(); // stairs are a GM-only navigation aid stays above fog
   if (!isPlayer) drawDraftRoom();
+  if (!isPlayer) drawAoeLineDraft();
   if (!isPlayer) drawStampDraft();
   if (!isPlayer) drawCalibrationDraft();
   if (measureLine) drawMeasureLine();
@@ -2809,6 +2811,26 @@ function drawCalibrationDraft() {
 
 /* ----------------------------- area of effect ----------------------------- */
 
+// Draw the in-progress line draft (GM-only, local — never synced to players).
+function drawAoeLineDraft() {
+  if (!aoeLineDraft.length) return;
+  ctx.save();
+  ctx.strokeStyle = aoeColor;
+  ctx.lineWidth = 2 / (curK * curMs);
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  aoeLineDraft.forEach((point, i) => (i === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
+  ctx.stroke();
+  aoeLineDraft.forEach((point) => {
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 4 / (curK * curMs), 0, Math.PI * 2);
+    ctx.fillStyle = aoeColor;
+    ctx.fill();
+  });
+  ctx.restore();
+}
+
 // Draw the live AoE hover template at the current cursor position (native coords).
 // Visible on both GM and player screens via the view broadcast.
 function drawAoeTemplate() {
@@ -2905,6 +2927,27 @@ function placeAoeMarker(native) {
     showPlayers: true,
   };
   state.aoeMarkers.push(marker);
+  renderAndSync();
+}
+
+// Prompt for a label and commit the in-progress line as a persistent AoE marker.
+// Cancelling the prompt keeps the draft intact so the user can retry Enter/dbl-click.
+function finishAoeLine() {
+  if (aoeLineDraft.length < 2) return;
+  const label = window.prompt("Label for this area (GM-only, optional):", "");
+  if (label === null) return; // cancelled — draft stays as-is
+  pushHistory();
+  const marker = {
+    id: uuid(),
+    shape: "line",
+    points: aoeLineDraft.map((point) => ({ ...point })),
+    sizeFt: aoeSizeFt,
+    color: aoeColor,
+    label: label.trim(),
+    showPlayers: true,
+  };
+  state.aoeMarkers.push(marker);
+  aoeLineDraft = [];
   renderAndSync();
 }
 
@@ -4975,7 +5018,11 @@ function onPointerDown(event) {
 
   if (mode === "aoe") {
     if (!state.imageData) return;
-    if (aoeShape === "line") return; // drafting logic lands in Task 2
+    if (aoeShape === "line") {
+      aoeLineDraft.push(native);
+      render();
+      return;
+    }
     placeAoeMarker(toNativePoint(event));
     return;
   }
@@ -5338,6 +5385,10 @@ function onDoubleClick(event) {
     editAoeMarkerLabel(aoeMarker);
     return;
   }
+  if (mode === "aoe" && aoeShape === "line" && aoeLineDraft.length >= 2) {
+    finishAoeLine();
+    return;
+  }
   if (mode === "polygon" || mode === "namedPolygon") finishRoom();
 }
 
@@ -5379,6 +5430,7 @@ function onKeyDown(event) {
   }
 
   const drawingPolygon = mode === "polygon" || mode === "namedPolygon";
+  const drawingAoeLine = mode === "aoe" && aoeShape === "line";
   const ctrl = event.ctrlKey || event.metaKey;
   if (ctrl && event.key.toLowerCase() === "z") {
     event.preventDefault();
@@ -5386,6 +5438,11 @@ function onKeyDown(event) {
     // so a single misclick doesn't scrap the whole shape (or earlier committed work).
     if (!event.shiftKey && drawingPolygon && drawingRoom.length) {
       drawingRoom.pop();
+      render();
+      return;
+    }
+    if (!event.shiftKey && drawingAoeLine && aoeLineDraft.length) {
+      aoeLineDraft.pop();
       render();
       return;
     }
@@ -5403,6 +5460,12 @@ function onKeyDown(event) {
   if ((event.key === "Backspace" || event.key === "Delete") && drawingPolygon && drawingRoom.length) {
     event.preventDefault();
     drawingRoom.pop();
+    render();
+    return;
+  }
+  if ((event.key === "Backspace" || event.key === "Delete") && drawingAoeLine && aoeLineDraft.length) {
+    event.preventDefault();
+    aoeLineDraft.pop();
     render();
     return;
   }
@@ -5445,9 +5508,20 @@ function onKeyDown(event) {
     finishRoom();
     return;
   }
+  if (event.key === "Enter" && drawingAoeLine && aoeLineDraft.length >= 2) {
+    event.preventDefault();
+    finishAoeLine();
+    return;
+  }
   if (event.key === "Escape" && drawingPolygon && drawingRoom.length) {
     event.preventDefault();
     drawingRoom = [];
+    render();
+    return;
+  }
+  if (event.key === "Escape" && drawingAoeLine && aoeLineDraft.length) {
+    event.preventDefault();
+    aoeLineDraft = [];
     render();
     return;
   }
