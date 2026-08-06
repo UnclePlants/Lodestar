@@ -24,6 +24,8 @@ Thanks to **u/DungeonDadofDadJokes** (music/SFX player and PDF reader), **u/Dere
 **u/Tommyruin** (tying tokens to the initiative tracker), and **u/FaceDeer** (the in-app
 shortcut overlay) on Reddit, whose suggestions shaped the v1.2.0 features.
 
+Concentration tracking, contributed by @romanmok in #9: a GM-clickable **C** toggle per combatant in the Initiative sidebar, mirrored as a read-only badge in the turn-order overlay for players. Syncs over the existing state broadcast, documented in the manual and README.
+
 ---
 
 ## Lucide
