@@ -2811,17 +2811,30 @@ function drawCalibrationDraft() {
 
 /* ----------------------------- area of effect ----------------------------- */
 
+// Stroke a polyline as a translucent thick body plus a thin solid centerline —
+// the line-shape equivalent of the fill+outline look used by circle/square/cone.
+function strokeAoeLine(points, widthPx, color) {
+  ctx.beginPath();
+  points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.globalAlpha = 0.28;
+  ctx.lineWidth = widthPx;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  ctx.globalAlpha = 0.9;
+  ctx.lineWidth = 2 / (curK * curMs);
+  ctx.stroke();
+}
+
 // Draw the in-progress line draft (GM-only, local — never synced to players).
 function drawAoeLineDraft() {
   if (!aoeLineDraft.length) return;
+  const pxPerFt = measureCellWorld() / FEET_PER_CELL / (state.map.scale || 1);
+  const widthPx = aoeSizeFt * pxPerFt;
   ctx.save();
-  ctx.strokeStyle = aoeColor;
-  ctx.lineWidth = 2 / (curK * curMs);
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  aoeLineDraft.forEach((point, i) => (i === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
-  ctx.stroke();
+  if (aoeLineDraft.length > 1) strokeAoeLine(aoeLineDraft, widthPx, aoeColor);
+  ctx.globalAlpha = 0.9;
   aoeLineDraft.forEach((point) => {
     ctx.beginPath();
     ctx.arc(point.x, point.y, 4 / (curK * curMs), 0, Math.PI * 2);
@@ -2967,6 +2980,20 @@ function drawAoeMarkers() {
     if (isPlayer && !m.showPlayers) return;
     const size = aoePxSize(m);
     ctx.save();
+    if (m.shape === "line") {
+      strokeAoeLine(m.points, size, m.color);
+      if (!isPlayer && m === selectedAoeMarker) {
+        ctx.globalAlpha = 0.6;
+        ctx.lineWidth = 3 / (curK * curMs);
+        ctx.strokeStyle = "#b1c301";
+        ctx.setLineDash([8 / (curK * curMs), 5 / (curK * curMs)]);
+        ctx.beginPath();
+        m.points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
     ctx.beginPath();
     if (m.shape === "circle") {
       ctx.arc(m.x, m.y, size, 0, Math.PI * 2);
