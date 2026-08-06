@@ -100,6 +100,7 @@ const controls = {
   aoeCustomSize: document.getElementById("aoeCustomSize"),
   aoeAngleSlider: document.getElementById("aoeAngleSlider"),
   aoeAngleRow: document.getElementById("aoeAngleRow"),
+  aoePanelHint: document.getElementById("aoePanelHint"),
   measureMode: document.getElementById("measureMode"),
   measureOptions: document.getElementById("measureOptions"),
   measureUnit: document.getElementById("measureUnit"),
@@ -317,13 +318,14 @@ let calibrating = null; // 'grid' | 'measure' while waiting for a drag-a-square 
 let calibrationDraft = null; // {start, end} preview during a calibration drag
 // Area of effect is a live "hover template" (not placed): the shape follows the cursor
 // and is mirrored to the player display in real time.
-let aoeShape = "circle"; // circle | square | cone (triangle)
+let aoeShape = "circle"; // circle | square | cone (triangle) | line
 let aoeColor = "#e2603a";
-let aoeSizeFt = 10; // size in feet (radius for circle, side for square, length for cone)
+let aoeSizeFt = 10; // size in feet (radius for circle, side for square, length for cone, width for line)
 let aoeAngle = -Math.PI / 2; // cone direction (radians); default points "up"
 let aoeTemplate = { visible: false, x: 0, y: 0 }; // GM: cursor pos · player: full received template
 let aoeSyncQueued = false;
 let aoeLineDraft = []; // native points of the in-progress line, cleared on finish/cancel/shape switch
+let aoeLineWidthTouched = false; // true once the user sets a line-specific width; suppresses the 1ft default reset
 const AOE_PRESETS = { circle: [5, 10, 15, 20], square: [10, 20, 30], cone: [15, 30], line: [1, 5, 10] };
 const AOE_CONE_HALF_ANGLE = Math.atan(0.5); // ~26.6°, total spread ≈ 53° (D&D cone)
 let selectedToken = null; // token highlighted in Move mode for arrow-key nudging (GM only)
@@ -822,7 +824,12 @@ function bindControls() {
   });
   controls.aoeCustomSize?.addEventListener("input", () => {
     const v = parseFloat(controls.aoeCustomSize.value);
-    if (v > 0) { aoeSizeFt = v; updateAoePresets(); render(); }
+    if (v > 0) {
+      aoeSizeFt = v;
+      if (aoeShape === "line") aoeLineWidthTouched = true;
+      updateAoePresets();
+      render();
+    }
   });
   controls.aoeAngleSlider?.addEventListener("input", () => {
     aoeAngle = parseFloat(controls.aoeAngleSlider.value) * Math.PI / 180;
@@ -1908,6 +1915,9 @@ function toggleFogRibbon() {
 
 const AOE_HINT_DEFAULT = "Hover to preview. Click to drop a persistent AoE marker (prompts for label). Right-click a marker to remove it. Double-click a marker to edit its label. Mouse wheel rotates the cone.";
 const AOE_HINT_LINE = "Click each point of the line. Enter or double-click to place it (2+ points, prompts for a label). Ctrl+Z/Backspace removes the last point, Escape cancels the draft. Right-click a placed line to remove it.";
+// In-panel hint (separate from the status-bar modeHint above) shown under the AoE popover's shape row.
+const AOE_PANEL_HINT_DEFAULT = "Hover to preview. Click to drop a persistent marker. Mouse wheel rotates the cone. Right-click a placed marker to remove it.";
+const AOE_PANEL_HINT_LINE = "Click each point of the line. Enter or double-click to finish it (2+ points). Right-click a placed line to remove it.";
 
 function setMode(nextMode) {
   exitLinkMode(); // leaving link mode if a tool is picked mid-link (restores the hint first)
@@ -2881,6 +2891,10 @@ function drawAoeTemplate() {
 function setAoeShape(shape) {
   aoeShape = shape;
   aoeLineDraft = []; // abandon any in-progress line when switching shapes
+  if (shape === "line" && !aoeLineWidthTouched) {
+    aoeSizeFt = 1;
+    if (controls.aoeCustomSize) controls.aoeCustomSize.value = aoeSizeFt;
+  }
   [
     ["circle", controls.aoeCircle],
     ["square", controls.aoeSquare],
@@ -2890,9 +2904,10 @@ function setAoeShape(shape) {
   updateAoePresets();
   controls.aoeAngleRow?.classList.toggle("hidden", shape !== "cone");
   if (mode === "aoe") controls.modeHint.textContent = shape === "line" ? AOE_HINT_LINE : AOE_HINT_DEFAULT;
+  if (controls.aoePanelHint) controls.aoePanelHint.textContent = shape === "line" ? AOE_PANEL_HINT_LINE : AOE_PANEL_HINT_DEFAULT;
 }
 
-// Size in native px for a placed AoE marker (radius, half-side, or cone length).
+// Size in native px for a placed AoE marker (radius, half-side, cone length, or line width).
 function aoePxSize(m) {
   return m.sizeFt * measureCellWorld() / FEET_PER_CELL / (state.map.scale || 1);
 }
@@ -2935,6 +2950,7 @@ function hitAoeMarker(native) {
       ];
       if (pointInPolygon(native, pts)) return m;
     } else if (m.shape === "line") {
+      if (!Array.isArray(m.points) || m.points.length < 2) continue;
       for (let j = 0; j < m.points.length - 1; j++) {
         if (distanceToSegment(native, m.points[j], m.points[j + 1]) <= size / 2) return m;
       }
@@ -3006,6 +3022,7 @@ function drawAoeMarkers() {
     const size = aoePxSize(m);
     ctx.save();
     if (m.shape === "line") {
+      if (!Array.isArray(m.points) || m.points.length < 2) { ctx.restore(); return; }
       strokeAoeLine(m.points, size, m.color);
       if (!isPlayer && m === selectedAoeMarker) {
         ctx.globalAlpha = 0.6;
@@ -3095,6 +3112,7 @@ function updateAoePresets() {
     btn.classList.toggle("active", ft === aoeSizeFt);
     btn.addEventListener("click", () => {
       aoeSizeFt = ft;
+      if (aoeShape === "line") aoeLineWidthTouched = true;
       if (controls.aoeCustomSize) controls.aoeCustomSize.value = ft;
       updateAoePresets();
       render();
@@ -5433,13 +5451,13 @@ function onDoubleClick(event) {
     return;
   }
   const native = toNativePoint(event);
+  if (mode === "aoe" && aoeShape === "line" && aoeLineDraft.length >= 2) {
+    finishAoeLine();
+    return;
+  }
   const aoeMarker = hitAoeMarker(native);
   if (aoeMarker) {
     editAoeMarkerLabel(aoeMarker);
-    return;
-  }
-  if (mode === "aoe" && aoeShape === "line" && aoeLineDraft.length >= 2) {
-    finishAoeLine();
     return;
   }
   if (mode === "polygon" || mode === "namedPolygon") finishRoom();
