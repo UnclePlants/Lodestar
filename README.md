@@ -32,7 +32,8 @@ A local-first battlemap display tool for game masters. Cast a map with fog of wa
 - **Multi-floor** — build multi-level locations; each floor has its own map, fog, tokens, and stairs. Navigate with the on-screen floor widget.
 - **Stairs** — place GM-only staircase arrows (color adjustable in the Floors section) that link floors; they scale with the grid and zoom and are invisible to players.
 - **Rotate** — rotate the GM map in 90° steps (fog, tokens, and stairs all ride along, and the player follows), or rotate just the player display independently so it reads right-side up from across the table.
-- **Tokens** — drop, drag, label, color, size, or give them a custom image; they snap to the grid and appear on both displays. Bulk-add tokens by multi-selecting image files (one token per image). In Move mode, click a token to select it (or drag to move it). A selected token gets 8 pop-out orientation arrows for stepping in any direction (including diagonals), and the arrow keys nudge it too; both trace the actual path and show the distance moved with the 5e alternating-diagonal rule. Dragging shows the distance as well. Delete removes a selected token.
+- **Tokens** — drop, drag, label, color, size, or give them a custom image; they snap to the grid and appear on both displays. Bulk-add tokens by multi-selecting image files (one token per image). In Move mode, click a token to select it (or drag to move it). A selected token gets 8 pop-out orientation arrows for stepping in any direction (including diagonals), and the arrow keys nudge it too; both trace the actual path and show the distance moved with the 5e alternating-diagonal rule. Dragging shows the distance as well. Delete removes a selected token. A selected token's colour, size, label and image edit live, and it can carry a GM-only note (shown on hover) or be hidden from players entirely (stealth tokens are never sent to the player display).
+- **3D dice roller** — press `D` (or the d20 button) for a dice tray: build a roll from the pad or type notation (`1d20+5`, `4d6dl1`, `2d20kh1`, `d%`), with one-click advantage/disadvantage. Physically simulated d4–d20 and d100 dice tumble across the map and settle on their result; tick *Players see the roll* to throw the identical dice on the player display, or keep it a secret GM roll. Recent rolls re-roll with a click. No libraries — it's all in `dice.js`.
 - **Map images** — drag an image file onto the map (or use the image button in the map toolbar) to place it; move, resize, and rotate it, optionally snap it to the grid, and toggle per-image whether players can see it (hidden from players by default).
 - **Notes** — drop GM-only rich-text sticky notes on the map with the note tool; type straight into them (font, size, bold/italic/underline/strikethrough), drag the title strip to move, drag the corner to resize. Notes never appear on the player display.
 - **PDF resources** — open character sheets, stat blocks, or rules PDFs in floating, resizable GM-only windows beside the map.
@@ -60,7 +61,7 @@ For anything you want to keep, use **Export** in the GM panel to save your whole
 
 ## Keyboard shortcuts (GM)
 
-- `V` move · `P` polygon fog · `N` named fog area · `B` brush · `E` eraser · `T` tokens · `A` area of effect · `M` measure · `S` stairs
+- `V` move · `P` polygon fog · `N` named fog area · `B` brush · `E` eraser · `T` tokens · `A` area of effect · `M` measure · `S` stairs · `D` dice roller
 - `F` fit map · `[` / `]` brush size · `Ctrl+Z` undo · `Ctrl+Shift+Z` redo
 - Arrow keys pan the map · `+` / `-` zoom (when no token is selected)
 - **Middle-mouse drag** pans the map in any tool, so you never have to switch tools just to reposition.
