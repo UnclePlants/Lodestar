@@ -215,6 +215,22 @@ const controls = {
   musicSfxFile: document.getElementById("musicSfxFile"),
   musicSfxList: document.getElementById("musicSfxList"),
   musicSfxVol: document.getElementById("musicSfxVol"),
+  diceLayer: document.getElementById("diceLayer"),
+  diceResult: document.getElementById("diceResult"),
+  diceToggle: document.getElementById("diceToggle"),
+  dicePanel: document.getElementById("dicePanel"),
+  diceClose: document.getElementById("diceClose"),
+  dicePad: document.getElementById("dicePad"),
+  diceClear: document.getElementById("diceClear"),
+  diceExpr: document.getElementById("diceExpr"),
+  diceError: document.getElementById("diceError"),
+  diceAdv: document.getElementById("diceAdv"),
+  diceDis: document.getElementById("diceDis"),
+  diceRoll: document.getElementById("diceRoll"),
+  dicePublic: document.getElementById("dicePublic"),
+  diceSound: document.getElementById("diceSound"),
+  diceColor: document.getElementById("diceColor"),
+  diceHistory: document.getElementById("diceHistory"),
 };
 
 // Per-bed control lookup so the music code can treat the two looping layers identically.
@@ -415,6 +431,7 @@ function handleMessage(message, source) {
     render();
   }
   if (message.type === "music" && isPlayer) applyMusicMessage(message);
+  if (message.type === "dice" && isPlayer && message.roll) playDiceRoll(message.roll, audioUnlocked);
   if (message.type === "player-ready" && !isPlayer) {
     if (source) playerWindow = source;
     playerHasClip.clear(); // a new display has none of the audio yet
@@ -656,6 +673,7 @@ function setup() {
     setupCollapsibleSections();
     updateInitiativeUI();
   }
+  setupDice();
 
   // Two transports so the link works whether or not BroadcastChannel delivers between
   // windows (it is unreliable on file://): the BroadcastChannel and a direct
@@ -4774,6 +4792,194 @@ function resyncMusicToPlayer() {
   });
 }
 
+/* ----------------------------- dice roller -----------------------------
+
+dice.js throws and draws the 3D dice. This wires up the GM's dice tray (a pad to build a roll,
+advantage/disadvantage, recent rolls), the result banner, and mirroring: a public roll is sent
+to the player display as the recorded tumble, so both screens show the identical throw. A
+secret roll never leaves the GM window. Tray preferences are remembered per browser. */
+
+const DICE_PREFS_KEY = "lodestar.dice";
+const dice = { stage: null, prefs: { color: "#8c1c2c", public: false, sound: true }, history: [], bannerTimer: 0 };
+
+function setupDice() {
+  if (!window.LodestarDice || !controls.diceLayer) return;
+  dice.stage = LodestarDice.createStage(controls.diceLayer);
+  if (isPlayer) return;
+  try {
+    Object.assign(dice.prefs, JSON.parse(localStorage.getItem(DICE_PREFS_KEY) || "{}"));
+  } catch {}
+  controls.diceColor.value = dice.prefs.color;
+  controls.dicePublic.checked = !!dice.prefs.public;
+  controls.diceSound.checked = dice.prefs.sound !== false;
+  controls.diceToggle?.addEventListener("click", () => toggleDicePanel());
+  controls.diceClose?.addEventListener("click", () => toggleDicePanel(false));
+  controls.dicePad?.addEventListener("click", (event) => {
+    const sides = Number(event.target.closest("[data-die]")?.dataset.die);
+    if (sides) addDieToExpr(sides);
+  });
+  controls.diceClear?.addEventListener("click", () => {
+    controls.diceExpr.value = "";
+    showDiceError("");
+    controls.diceExpr.focus();
+  });
+  controls.diceExpr?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      rollDice();
+    } else if (event.key === "Escape") {
+      toggleDicePanel(false);
+    }
+  });
+  controls.diceExpr?.addEventListener("input", () => showDiceError(""));
+  controls.diceRoll?.addEventListener("click", () => rollDice());
+  controls.diceAdv?.addEventListener("click", () => rollDice(withAdvantage("h")));
+  controls.diceDis?.addEventListener("click", () => rollDice(withAdvantage("l")));
+  controls.dicePublic?.addEventListener("change", () => saveDicePrefs({ public: controls.dicePublic.checked }));
+  controls.diceSound?.addEventListener("change", () => saveDicePrefs({ sound: controls.diceSound.checked }));
+  controls.diceColor?.addEventListener("input", () => saveDicePrefs({ color: controls.diceColor.value }));
+  controls.diceHistory?.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-expr]");
+    if (row) rollDice(row.dataset.expr);
+  });
+}
+
+function saveDicePrefs(patch) {
+  Object.assign(dice.prefs, patch);
+  try {
+    localStorage.setItem(DICE_PREFS_KEY, JSON.stringify(dice.prefs));
+  } catch {}
+}
+
+function toggleDicePanel(force) {
+  if (!controls.dicePanel) return;
+  const open = force ?? controls.dicePanel.classList.contains("hidden");
+  controls.dicePanel.classList.toggle("hidden", !open);
+  controls.diceToggle?.setAttribute("aria-expanded", String(open));
+  if (open) controls.diceExpr?.focus();
+}
+
+function showDiceError(message) {
+  if (!controls.diceError) return;
+  controls.diceError.textContent = message;
+  controls.diceError.hidden = !message;
+}
+
+// The pad adds one die to the roll: "1d20" becomes "2d20", a new size is appended ("+1d6").
+function addDieToExpr(sides) {
+  const current = controls.diceExpr.value.trim();
+  let terms;
+  try {
+    terms = current ? LodestarDice.parse(current) : [];
+  } catch {
+    controls.diceExpr.value = `${current}+1d${sides}`;
+    return;
+  }
+  const same = terms.find((t) => t.type === "dice" && t.sides === sides && !t.keep && t.sign > 0);
+  if (same) same.count += 1;
+  else terms.push({ type: "dice", sign: 1, count: 1, sides, keep: null });
+  controls.diceExpr.value = LodestarDice.format(terms);
+  showDiceError("");
+}
+
+// Advantage / disadvantage: the roll's d20 becomes 2d20 keep-highest / keep-lowest (a d20 is
+// added if there isn't one), keeping any other dice and modifiers.
+function withAdvantage(mode) {
+  let terms;
+  try {
+    terms = LodestarDice.parse(controls.diceExpr.value.trim() || "1d20");
+  } catch {
+    terms = [];
+  }
+  const d20 = terms.find((t) => t.type === "dice" && t.sides === 20);
+  if (d20) Object.assign(d20, { count: 2, keep: { mode, n: 1 } });
+  else terms.unshift({ type: "dice", sign: 1, count: 2, sides: 20, keep: { mode, n: 1 } });
+  return LodestarDice.format(terms);
+}
+
+function rollDice(exprOverride) {
+  if (!dice.stage) return;
+  if (exprOverride !== undefined) controls.diceExpr.value = exprOverride;
+  let roll;
+  try {
+    roll = LodestarDice.createRoll(controls.diceExpr.value.trim() || "1d20", { color: dice.prefs.color });
+  } catch (error) {
+    showDiceError(error.message);
+    return;
+  }
+  showDiceError("");
+  controls.diceExpr.value = roll.expr; // normalised, e.g. "d20 + 5" -> "1d20+5"
+  roll.public = !!dice.prefs.public;
+  dice.history.unshift({ expr: roll.expr, total: roll.total, detail: diceDetailHtml(roll), public: roll.public });
+  dice.history.length = Math.min(dice.history.length, 12);
+  renderDiceHistory();
+  playDiceRoll(roll, dice.prefs.sound !== false);
+  if (roll.public) relay({ type: "dice", roll });
+}
+
+function playDiceRoll(roll, sound) {
+  if (!dice.stage) return;
+  hideDiceResult(true);
+  dice.stage.play(roll, {
+    sound,
+    onSettle: () => showDiceResult(roll),
+    onDone: () => hideDiceResult(),
+  });
+}
+
+// "[17, <s>4</s>] + 5": each die's value, dropped dice struck through.
+function diceDetailHtml(roll) {
+  return roll.terms
+    .map((t, i) => {
+      const sign = i === 0 ? (t.sign < 0 ? "−" : "") : t.sign < 0 ? " − " : " + ";
+      if (!t.rolls) return sign + Number(t.value);
+      const values = t.rolls.map((r) => (r.dropped ? `<s>${Number(r.value)}</s>` : String(Number(r.value))));
+      return `${sign}[${values.join(", ")}]`;
+    })
+    .join("");
+}
+
+function showDiceResult(roll) {
+  const el = controls.diceResult;
+  if (!el) return;
+  clearTimeout(dice.bannerTimer);
+  const secret = !isPlayer && !roll.public ? '<span class="dice-secret">GM only</span>' : "";
+  el.innerHTML =
+    `<div class="dice-result-total">${Number(roll.total)}</div>` +
+    `<div class="dice-result-expr">${escapeHtml(roll.expr)}${secret}</div>` +
+    `<div class="dice-result-detail">${diceDetailHtml(roll)}</div>`;
+  el.classList.remove("fading");
+  el.hidden = false;
+}
+
+function hideDiceResult(immediate) {
+  const el = controls.diceResult;
+  if (!el || el.hidden) return;
+  clearTimeout(dice.bannerTimer);
+  if (immediate) {
+    el.hidden = true;
+    return;
+  }
+  el.classList.add("fading");
+  dice.bannerTimer = setTimeout(() => {
+    el.hidden = true;
+    el.classList.remove("fading");
+  }, 600);
+}
+
+function renderDiceHistory() {
+  if (!controls.diceHistory) return;
+  controls.diceHistory.innerHTML = dice.history
+    .map(
+      (h) => `<li data-expr="${escapeHtml(h.expr)}" title="Roll ${escapeHtml(h.expr)} again">
+        <span class="dice-history-expr">${escapeHtml(h.expr)}${h.public ? "" : ' <span class="dice-secret">GM</span>'}</span>
+        <span class="dice-history-total">${Number(h.total)}</span>
+        <span class="dice-history-detail">${h.detail}</span>
+      </li>`,
+    )
+    .join("");
+}
+
 /* ----------------------------- ping / measure ----------------------------- */
 
 function triggerPing(native) {
@@ -5508,6 +5714,10 @@ function onKeyDown(event) {
     exitLinkMode();
     return;
   }
+  if (event.key === "Escape" && controls.dicePanel && !controls.dicePanel.classList.contains("hidden")) {
+    toggleDicePanel(false);
+    return;
+  }
   if (event.target?.matches?.("input, button, textarea, select")) return;
   if (event.target?.isContentEditable) return; // typing in a note shouldn't trigger tool keys
 
@@ -5613,6 +5823,10 @@ function onKeyDown(event) {
 
   const shortcuts = { v: "pan", h: "pan", p: "polygon", n: "namedPolygon", b: "brush", e: "eraser", t: "token", a: "aoe", m: "measure", s: "stair" };
   const key = event.key.toLowerCase();
+  if (key === "d" && !ctrl && !event.altKey) {
+    toggleDicePanel();
+    return;
+  }
   if (shortcuts[key]) {
     setMode(shortcuts[key]);
     return;

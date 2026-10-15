@@ -2686,3 +2686,301 @@ input:disabled {
   right: 4px;
   width: 7px;
 }
+
+/* ---- Dice roller ---- */
+
+/* The 3D dice tumble on a transparent overlay above the map and its floating panels, so no
+   die ever lands out of sight (it's click-through, and fades a few seconds after settling). */
+.dice-layer {
+  height: 100%;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  z-index: 8;
+}
+
+.dice-layer[hidden] {
+  display: none;
+}
+
+/* The settled result, top-centre (under the GM's hint bar). */
+.dice-result {
+  animation: dice-result-in 0.25s ease-out;
+  background: rgba(6, 2, 28, 0.9);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  color: var(--text);
+  left: 50%;
+  max-width: min(560px, calc(100% - 40px));
+  padding: 10px 22px 12px;
+  pointer-events: none;
+  position: absolute;
+  text-align: center;
+  top: 76px;
+  transform: translateX(-50%);
+  transition: opacity 0.6s ease;
+  z-index: 9;
+}
+
+.app-shell[data-role="player"] .dice-result {
+  top: 28px;
+}
+
+.dice-result[hidden] {
+  display: none;
+}
+
+.dice-result.fading {
+  opacity: 0;
+}
+
+@keyframes dice-result-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+
+.dice-result-total {
+  color: var(--accent);
+  font-family: Garamond, "EB Garamond", Georgia, serif;
+  font-size: 2.6rem;
+  font-weight: 700;
+  line-height: 1.05;
+}
+
+.dice-result-expr {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.dice-result-detail,
+.dice-history-detail {
+  color: var(--muted);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.dice-result-detail s,
+.dice-history-detail s {
+  opacity: 0.6;
+}
+
+.dice-secret {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 6px;
+  padding: 1px 7px;
+  vertical-align: 2px;
+}
+
+.dice-fab {
+  align-items: center;
+  background: rgba(6, 2, 28, 0.82);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  bottom: 16px;
+  color: var(--text);
+  display: flex;
+  height: 44px;
+  justify-content: center;
+  padding: 0;
+  position: absolute;
+  right: 16px;
+  width: 44px;
+  z-index: 6;
+}
+
+.dice-fab:hover,
+.dice-fab[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dice-fab svg {
+  fill: none;
+  height: 24px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+  width: 24px;
+}
+
+.dice-panel {
+  background: rgba(25, 28, 29, 0.96);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  bottom: 72px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 10px;
+  max-height: calc(100% - 110px);
+  overflow-y: auto;
+  padding: 12px;
+  position: absolute;
+  right: 16px;
+  width: 272px;
+  z-index: 7;
+}
+
+.app-shell[data-role="player"] .dice-fab,
+.app-shell[data-role="player"] .dice-panel {
+  display: none;
+}
+
+.dice-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.dice-head h2 {
+  font-size: 0.95rem;
+}
+
+.dice-close {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 1.3rem;
+  line-height: 1;
+  min-height: 0;
+  padding: 2px 6px;
+}
+
+.dice-close:hover {
+  color: var(--text);
+}
+
+.dice-pad {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.dice-pad button {
+  font-weight: 600;
+  min-height: 34px;
+  padding: 0;
+}
+
+.dice-pad button:hover {
+  border-color: var(--accent-2);
+}
+
+#diceClear {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.dice-expr {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.dice-expr:focus {
+  border-color: var(--accent-2);
+  outline: none;
+}
+
+.dice-error {
+  color: var(--danger);
+  font-size: 0.8rem;
+  margin: -4px 0 0;
+}
+
+.dice-error[hidden] {
+  display: none;
+}
+
+.dice-actions {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 1fr 1fr 2fr;
+}
+
+.dice-roll-btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #11140a;
+  font-weight: 700;
+}
+
+.dice-roll-btn:hover {
+  background: #c4d81a;
+  border-color: #c4d81a;
+}
+
+.dice-options {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  gap: 6px 12px;
+}
+
+.dice-color {
+  margin-left: auto;
+}
+
+.dice-color input {
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  height: 26px;
+  padding: 1px;
+  width: 34px;
+}
+
+.dice-history {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 8px 0 0;
+}
+
+.dice-history:empty {
+  display: none;
+}
+
+.dice-history li {
+  border-radius: 6px;
+  cursor: pointer;
+  display: grid;
+  gap: 0 8px;
+  grid-template-columns: 1fr auto;
+  padding: 4px 6px;
+}
+
+.dice-history li:hover {
+  background: var(--panel-2);
+}
+
+.dice-history-expr {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.dice-history-total {
+  color: var(--accent);
+  font-weight: 700;
+  grid-row: span 2;
+  align-self: center;
+}

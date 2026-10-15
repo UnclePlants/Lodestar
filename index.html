@@ -533,6 +533,49 @@
         <button id="shortcutsBtn" class="shortcuts-fab" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
         </button>
+        <!-- Dice: the 3D roll overlay and result banner (both screens), plus the GM's dice tray. -->
+        <canvas id="diceLayer" class="dice-layer" aria-hidden="true"></canvas>
+        <div id="diceResult" class="dice-result" hidden aria-live="polite"></div>
+        <button id="diceToggle" class="dice-fab" type="button" title="Dice roller (D)" aria-label="Dice roller" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 20.5 7.25v9.5L12 21.5 3.5 16.75v-9.5Z"/><path d="M12 7.5 16.5 15h-9Z"/><path d="M12 2.5v5M20.5 7.25 16.5 15M3.5 7.25 7.5 15M3.5 16.75 7.5 15M20.5 16.75 16.5 15M7.5 15 12 21.5 16.5 15"/></svg>
+        </button>
+        <div id="dicePanel" class="dice-panel hidden" role="dialog" aria-label="Dice roller">
+          <div class="dice-head">
+            <h2>Dice</h2>
+            <button id="diceClose" class="dice-close" type="button" title="Close (D)" aria-label="Close the dice roller">&times;</button>
+          </div>
+          <div class="dice-pad" id="dicePad">
+            <button type="button" data-die="4">d4</button>
+            <button type="button" data-die="6">d6</button>
+            <button type="button" data-die="8">d8</button>
+            <button type="button" data-die="10">d10</button>
+            <button type="button" data-die="12">d12</button>
+            <button type="button" data-die="20">d20</button>
+            <button type="button" data-die="100">d100</button>
+            <button type="button" id="diceClear" title="Clear the roll">Clear</button>
+          </div>
+          <input id="diceExpr" class="dice-expr" type="text" placeholder="e.g. 1d20+5 · 4d6dl1 · 2d20kh1" autocomplete="off" spellcheck="false" aria-label="Roll to make">
+          <p id="diceError" class="dice-error" hidden></p>
+          <div class="dice-actions">
+            <button id="diceAdv" type="button" title="Roll a d20 with advantage (2d20, keep the highest)">Adv</button>
+            <button id="diceDis" type="button" title="Roll a d20 with disadvantage (2d20, keep the lowest)">Dis</button>
+            <button id="diceRoll" class="dice-roll-btn" type="button">Roll</button>
+          </div>
+          <div class="dice-options">
+            <label class="checkbox-row" title="Off: a secret roll only you see">
+              <input id="dicePublic" type="checkbox">
+              <span>Players see the roll</span>
+            </label>
+            <label class="checkbox-row">
+              <input id="diceSound" type="checkbox" checked>
+              <span>Sound</span>
+            </label>
+            <label class="dice-color" title="Dice colour">
+              <input id="diceColor" type="color" value="#8c1c2c">
+            </label>
+          </div>
+          <ol id="diceHistory" class="dice-history" aria-label="Recent rolls"></ol>
+        </div>
         <!-- Credit + support link for the demo map creator, bottom-center of the map (GM only). -->
         <a class="map-credit-link" href="https://www.patreon.com/c/Fantasy_Atlas/home" target="_blank" rel="noopener">Demo map by Fantasy Atlas ↗</a>
       </section>
@@ -689,6 +732,7 @@
             <div class="sc-row"><kbd>A</kbd><span>Area of effect</span></div>
             <div class="sc-row"><kbd>M</kbd><span>Measure</span></div>
             <div class="sc-row"><kbd>S</kbd><span>Stairs</span></div>
+            <div class="sc-row"><kbd>D</kbd><span>Dice roller</span></div>
           </section>
           <section class="sc-group">
             <h3>Fog tools</h3>
@@ -765,6 +809,7 @@
       </form>
     </dialog>
 
+    <script src="dice.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
