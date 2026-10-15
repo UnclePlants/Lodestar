@@ -66,6 +66,8 @@ const controls = {
   gridOpacity: document.getElementById("gridOpacity"),
   gridLineWidth: document.getElementById("gridLineWidth"),
   mapScale: document.getElementById("mapScale"),
+  mapAnimate: document.getElementById("mapAnimate"),
+  mapAnimateRow: document.getElementById("mapAnimateRow"),
   brushSize: document.getElementById("brushSize"),
   fogTint: document.getElementById("fogTint"),
   gmFogOpacity: document.getElementById("gmFogOpacity"),
@@ -306,7 +308,11 @@ const state = {
   floorCount: 1, // player-side display only
 };
 
-let mapImage = new Image();
+// The current floor's map, whatever its format (see "map media" below). `source` is what
+// render() draws: an <img>, the current decoded frame of an animated image, or a <video>.
+let mapMedia = emptyMapMedia();
+let mapMediaReady = Promise.resolve(); // settles when the latest map load finishes (or fails)
+let mapAnimGen = 0; // bumped whenever map playback starts/stops, retiring old frame loops
 let splashImage = new Image();
 let mode = "pan";
 let drawingRoom = [];
@@ -514,9 +520,10 @@ function prefetchDemo() {
 // Resolves once the current map image is decoded and drawable, capped at `capMs` so a
 // decode hiccup can never strand the start screen.
 function whenMapReady(capMs) {
-  const img = mapImage;
-  if (!img || !img.src) return Promise.resolve();
-  const decoded = img.decode ? img.decode().catch(() => {}) : Promise.resolve();
+  const decoded = mapMediaReady.then(() => {
+    const img = mapMedia.kind === "image" ? mapMedia.source : null;
+    return img && img.decode ? img.decode().catch(() => {}) : undefined;
+  });
   const cap = new Promise((resolve) => setTimeout(resolve, capMs));
   return Promise.race([decoded, cap]);
 }
@@ -764,6 +771,11 @@ function bindControls() {
   });
   controls.mapScale.addEventListener("input", () => {
     state.map.scale = Number(controls.mapScale.value);
+    renderAndSync();
+  });
+  controls.mapAnimate?.addEventListener("input", () => {
+    state.map.paused = !controls.mapAnimate.checked;
+    syncMapPlayback();
     renderAndSync();
   });
 
@@ -1055,8 +1067,10 @@ function loadMapFile(event) {
   const file = event.target.files[0];
   if (!file) return;
 
+  // Images, animated GIFs and videos all arrive as a data URL; loadMapMedia() picks the
+  // right player from its MIME type.
   const reader = new FileReader();
-  reader.onerror = () => window.alert("Could not read that image file.");
+  reader.onerror = () => window.alert("Could not read that map file.");
   reader.onload = () => {
     shell.classList.remove("is-demo"); // your own map: drop the demo-map credit
     state.imageData = reader.result;
@@ -1071,9 +1085,9 @@ function loadMapFile(event) {
     undoStack.length = 0;
     redoStack.length = 0;
     updateUndoButtons();
-    loadImage(state.imageData, () => {
-      state.imageWidth = mapImage.naturalWidth;
-      state.imageHeight = mapImage.naturalHeight;
+    loadMapMedia(state.imageData, () => {
+      state.imageWidth = mapMedia.width;
+      state.imageHeight = mapMedia.height;
       fogDirty = true;
       captureCurrentFloor(); // flush new image into the current floor record
       updatePlayerSliderRanges();
@@ -1122,14 +1136,23 @@ function saveSession() {
   const mapName = enteredName?.trim();
   if (!mapName) return;
 
-  const saveData = {
-    id: makeMapId(mapName),
-    app: APP_NAME,
-    version: SAVE_FILE_VERSION,
-    name: mapName,
-    savedAt: new Date().toISOString(),
-    state: JSON.parse(JSON.stringify(state)),
-  };
+  // The floor records already carry every map, so skip the top-level mirror of the current
+  // one rather than storing it twice (that matters once a map is a video).
+  const { imageData, ...savedState } = state;
+  let saveData;
+  try {
+    saveData = {
+      id: makeMapId(mapName),
+      app: APP_NAME,
+      version: SAVE_FILE_VERSION,
+      name: mapName,
+      savedAt: new Date().toISOString(),
+      state: JSON.parse(JSON.stringify(savedState)),
+    };
+  } catch (error) {
+    window.alert(`Could not save this map: ${error.message}`); // e.g. a video too large to serialize
+    return;
+  }
 
   saveMapRecord(saveData)
     .then(() => {
@@ -1444,13 +1467,14 @@ function loadSnapshot(snapshot) {
     }
     refreshFloorUI();
     updateInitiativeUI();
+    syncMapPlayback(); // player: picks up the GM's play/pause of an animated map
     render();
   };
 
   if (state.imageData) {
-    loadImage(state.imageData, finish);
+    loadMapMedia(state.imageData, finish);
   } else {
-    mapImage = new Image();
+    disposeMapMedia();
     finish();
   }
   if (state.splash.imageData) {
@@ -1465,12 +1489,14 @@ function applyAssets(message) {
   state.splash.imageData = message.splash?.imageData || "";
   state.splash.imageName = message.splash?.imageName || "";
   if (state.imageData) {
-    loadImage(state.imageData, () => {
-      state.imageWidth = mapImage.naturalWidth;
-      state.imageHeight = mapImage.naturalHeight;
+    loadMapMedia(state.imageData, () => {
+      state.imageWidth = mapMedia.width;
+      state.imageHeight = mapMedia.height;
       fogDirty = true;
       render();
     });
+  } else {
+    disposeMapMedia(); // GM moved to an empty floor: stop any video still playing here
   }
   if (state.splash.imageData) loadSplashImage(state.splash.imageData, render);
 }
@@ -1606,13 +1632,13 @@ function applyFloor(floor) {
   undoStack.length = 0;
   redoStack.length = 0;
   updateUndoButtons();
-  mapImage = new Image();
   if (state.imageData) {
-    loadImage(state.imageData, () => {
+    loadMapMedia(state.imageData, () => {
       fitMap(false);
       render();
     });
   } else {
+    disposeMapMedia();
     render();
   }
   applyPlayerSquareLock(); // keep the locked TV square size across map/floor changes
@@ -2348,7 +2374,8 @@ function render() {
   }
 
   emptyState.classList.toggle("hidden", Boolean(state.imageData));
-  if (!state.imageData || !mapImage.complete) return;
+  const mapSource = mapMedia.source;
+  if (!state.imageData || !mapSource) return;
 
   const t = viewTransform();
   curK = t.k;
@@ -2363,7 +2390,7 @@ function render() {
   ctx.translate(-t.cx * t.ms, -t.cy * t.ms);
 
   // World block (native x map.scale)
-  ctx.drawImage(mapImage, 0, 0, w, h);
+  ctx.drawImage(mapSource, 0, 0, w, h);
   if (state.grid.enabled) drawGrid(w, h);
 
   // Native block
@@ -5608,13 +5635,290 @@ function addInterpolatedStrokePoints(stroke, from, to, spacing) {
   }
 }
 
-/* ----------------------------- misc ----------------------------- */
+/* ----------------------------- map media (image / GIF / video) -----------------------------
 
-function loadImage(src, afterLoad) {
-  mapImage = new Image();
-  mapImage.onload = afterLoad;
-  mapImage.src = src;
+A map is always stored as one data URL, so saves, floors, exports and the player sync treat
+every format alike; only the drawable differs. Still images stay a plain <img>. Animated
+images (GIF, animated WebP/PNG) go through ImageDecoder one frame at a time, so a huge
+animated map never holds more than its current frame decoded. Videos play from a muted,
+looping <video>. Both repaint the canvas while they play, keeping fog, tokens and the grid
+on top. Browsers without ImageDecoder fall back to the <img>, which shows a GIF's first frame. */
+
+function emptyMapMedia() {
+  return { kind: "none", src: "", source: null, width: 0, height: 0, playing: false };
 }
+
+// Load `src` as the current map, then call afterLoad once its size is known and a first
+// frame can be drawn. Asking for the map that is already showing (or still loading) just
+// waits for it, so repeated assets/sync messages never restart a video.
+function loadMapMedia(src, afterLoad) {
+  if (src === mapMedia.src) {
+    const m = mapMedia;
+    mapMediaReady.then(() => {
+      if (mapMedia === m && m.source) afterLoad?.();
+    });
+    return;
+  }
+  disposeMapMedia();
+  const m = { ...emptyMapMedia(), kind: "loading", src };
+  mapMedia = m;
+  let settle;
+  mapMediaReady = new Promise((resolve) => (settle = resolve));
+  const type = dataUrlType(src);
+  try {
+    if (type.startsWith("video/")) loadVideoMap(m, type, afterLoad, settle);
+    else if (mayBeAnimatedImage(src, type)) loadAnimatedMap(m, type, afterLoad, settle);
+    else loadStillMap(m, afterLoad, settle);
+  } catch {
+    settle(); // malformed data URL: leave the map blank rather than throw mid-load
+  }
+}
+
+function loadStillMap(m, afterLoad, settle) {
+  const img = new Image();
+  img.onload = () => {
+    if (mapMedia === m) Object.assign(m, { kind: "image", source: img, width: img.naturalWidth, height: img.naturalHeight });
+    settle();
+    if (mapMedia === m) afterLoad?.();
+  };
+  img.onerror = settle;
+  img.src = m.src;
+}
+
+async function loadAnimatedMap(m, type, afterLoad, settle) {
+  let decoder = null;
+  let frameCount = 0;
+  let first = null;
+  try {
+    if (!(await ImageDecoder.isTypeSupported(type))) throw new Error("unsupported image type");
+    decoder = new ImageDecoder({ data: dataUrlBytes(m.src), type, preferAnimation: true });
+    await decoder.tracks.ready;
+    await decoder.completed; // the whole file is in memory, so this makes frameCount final
+    frameCount = decoder.tracks.selectedTrack?.frameCount || 0;
+    if (frameCount < 2) throw new Error("not animated");
+    first = (await decoder.decode({ frameIndex: 0 })).image;
+  } catch {
+    decoder?.close();
+    // A single-frame file, or one this decoder can't handle: show it as a plain image.
+    if (mapMedia === m) loadStillMap(m, afterLoad, settle);
+    else settle();
+    return;
+  }
+  if (mapMedia !== m) {
+    first.close();
+    decoder.close();
+    settle();
+    return;
+  }
+  Object.assign(m, {
+    kind: "animated",
+    source: first,
+    decoder,
+    frameIndex: 0,
+    frameCount,
+    width: first.displayWidth,
+    height: first.displayHeight,
+  });
+  settle();
+  afterLoad?.();
+  syncMapPlayback();
+}
+
+function loadVideoMap(m, type, afterLoad, settle) {
+  const video = document.createElement("video");
+  video.muted = true; // silent so it may autoplay on the player display; table audio lives in the music player
+  video.loop = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  // An object URL rather than the (possibly hundreds of MB) data URL as the video's src.
+  const url = URL.createObjectURL(new Blob([dataUrlBytes(m.src)], { type }));
+  const fail = () => {
+    if (m.source === video) return; // a hiccup after playback started: keep the last frame
+    releaseVideo(video, url);
+    settle();
+    if (mapMedia === m && !isPlayer) {
+      window.alert("This browser can't play that video. Try an MP4 (H.264) or WebM file.");
+    }
+  };
+  video.addEventListener(
+    "loadeddata",
+    () => {
+      if (!video.videoWidth) return fail(); // audio-only file
+      if (mapMedia !== m) {
+        releaseVideo(video, url);
+        settle();
+        return;
+      }
+      Object.assign(m, { kind: "video", source: video, url, width: video.videoWidth, height: video.videoHeight });
+      settle();
+      afterLoad?.();
+      syncMapPlayback();
+    },
+    { once: true },
+  );
+  video.addEventListener("error", fail, { once: true });
+  video.src = url;
+}
+
+function releaseVideo(video, url) {
+  video.pause();
+  video.removeAttribute("src");
+  video.load(); // drops the decoder and its buffered frames
+  URL.revokeObjectURL(url);
+}
+
+function disposeMapMedia() {
+  const m = mapMedia;
+  mapAnimGen++; // retire any running frame / repaint loop
+  if (m.kind === "video") releaseVideo(m.source, m.url);
+  if (m.kind === "animated") {
+    m.source.close();
+    m.decoder.close();
+  }
+  mapMedia = emptyMapMedia();
+  updateMapPlaybackUI();
+}
+
+// Start or stop the map's own animation to match the GM's "Play animated map" switch
+// (state.map.paused, which the sync carries to the player). Safe to call repeatedly.
+function syncMapPlayback() {
+  const m = mapMedia;
+  updateMapPlaybackUI();
+  const play = (m.kind === "video" || m.kind === "animated") && !state.map.paused;
+  if (play === m.playing) return;
+  m.playing = play;
+  const gen = ++mapAnimGen;
+  if (m.kind === "video") {
+    if (play) playVideoMap(m.source, gen);
+    else m.source.pause();
+  } else if (play) {
+    playAnimatedMap(m, gen);
+  }
+}
+
+// The loop is pinned to the wall clock: the GM and player windows share the machine's
+// clock, so both show the same moment without exchanging any messages.
+function playVideoMap(video, gen) {
+  const pinned = Number.isFinite(video.duration) && video.duration > 0;
+  if (pinned) video.currentTime = (Date.now() / 1000) % video.duration;
+  video.playbackRate = 1;
+  video.play().catch(() => {});
+  let nextCheck = 0;
+  const tick = (now) => {
+    if (gen !== mapAnimGen) return;
+    if (!video.paused && !video.seeking) {
+      render();
+      if (pinned && now >= nextCheck) {
+        nextCheck = now + 500;
+        keepVideoOnClock(video);
+      }
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+// Each seek (the start, and every wrap back to frame 0) lands a little late, so left alone
+// the two screens drift apart loop by loop. Nudge the playback rate to pull back onto the
+// clock without visible jumps; only a big gap (e.g. after a hidden tab) gets a hard seek.
+function keepVideoOnClock(video) {
+  const d = video.duration;
+  let drift = video.currentTime - ((Date.now() / 1000) % d);
+  if (drift > d / 2) drift -= d;
+  else if (drift < -d / 2) drift += d;
+  if (Math.abs(drift) > 2) {
+    video.currentTime = (Date.now() / 1000) % d;
+    video.playbackRate = 1;
+  } else {
+    video.playbackRate = Math.abs(drift) < 0.04 ? 1 : 1 - Math.max(-0.25, Math.min(0.25, drift * 0.5));
+  }
+}
+
+// Show each frame for its own delay, decoding the next one while the current is on screen.
+function playAnimatedMap(m, gen) {
+  let due = performance.now() + frameDelay(m.source);
+  const advance = () => {
+    const next = (m.frameIndex + 1) % m.frameCount;
+    m.decoder.decode({ frameIndex: next }).then(
+      ({ image }) => {
+        setTimeout(() => {
+          if (gen !== mapAnimGen) {
+            image.close();
+            return;
+          }
+          const shown = m.source;
+          m.source = image;
+          m.frameIndex = next;
+          shown.close();
+          render();
+          due = performance.now() + frameDelay(image);
+          advance();
+        }, Math.max(0, due - performance.now()));
+      },
+      () => {}, // decoder closed: the map was replaced
+    );
+  };
+  advance();
+}
+
+// Frame delay in ms. Like browsers do for GIFs, treat ≤10 ms (or missing) delays as 100 ms.
+function frameDelay(frame) {
+  const ms = (frame.duration || 0) / 1000; // VideoFrame durations are in microseconds
+  return ms > 10 ? ms : 100;
+}
+
+// GM: the "Play animated map" switch only appears while the map actually animates.
+function updateMapPlaybackUI() {
+  if (isPlayer || !controls.mapAnimateRow) return;
+  const animated = mapMedia.kind === "video" || mapMedia.kind === "animated";
+  controls.mapAnimateRow.classList.toggle("hidden", !animated);
+  controls.mapAnimate.checked = !state.map.paused;
+}
+
+// MIME type of a base64 data URL, or "" for anything else (which loads as a plain image).
+function dataUrlType(src) {
+  const match = /^data:([^;,]+)(?:;[^,;]*)*;base64,/i.exec(src.slice(0, 200));
+  return match ? match[1].toLowerCase() : "";
+}
+
+// Decode a base64 data URL's payload (or only its first `limit` bytes) to raw bytes.
+function dataUrlBytes(src, limit = Infinity) {
+  const start = src.indexOf(",") + 1;
+  const end = limit === Infinity ? src.length : Math.min(src.length, start + Math.ceil(limit / 3) * 4);
+  const b64 = src.slice(start, end);
+  if (Uint8Array.fromBase64) return Uint8Array.fromBase64(b64);
+  const pad = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
+  const out = new Uint8Array(Math.max(0, Math.floor(b64.length / 4) * 3 - pad));
+  const CHUNK = 1 << 20; // base64 chars per atob() call; a multiple of 4
+  let o = 0;
+  for (let i = 0; i < b64.length; i += CHUNK) {
+    const bin = atob(b64.slice(i, i + CHUNK));
+    for (let j = 0; j < bin.length; j++) out[o++] = bin.charCodeAt(j);
+  }
+  return out;
+}
+
+// Whether an image might have several frames and so needs ImageDecoder. GIFs always take
+// that route; WebP and PNG only when their header flags an animation, so ordinary (often
+// huge) PNG/WebP maps keep the fast <img> path.
+function mayBeAnimatedImage(src, type) {
+  if (typeof ImageDecoder === "undefined") return false;
+  if (type === "image/gif") return true;
+  if (type !== "image/webp" && type !== "image/png") return false;
+  const b = dataUrlBytes(src, 65536);
+  const tag = (at) => String.fromCharCode(b[at], b[at + 1], b[at + 2], b[at + 3]);
+  if (type === "image/webp") return tag(12) === "VP8X" && (b[20] & 0x02) !== 0; // animation flag
+  // APNG: an acTL chunk comes before the first IDAT.
+  for (let at = 8; at + 8 <= b.length; ) {
+    const chunk = tag(at + 4);
+    if (chunk === "acTL") return true;
+    if (chunk === "IDAT") return false;
+    at += 12 + ((b[at] << 24) >>> 0) + (b[at + 1] << 16) + (b[at + 2] << 8) + b[at + 3];
+  }
+  return false;
+}
+
+/* ----------------------------- misc ----------------------------- */
 
 function loadSplashImage(src, afterLoad) {
   splashImage = new Image();
