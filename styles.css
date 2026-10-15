@@ -973,6 +973,47 @@ input:disabled {
   width: 36px;
 }
 
+/* Selected-token editor extras (GM note, hide from players). */
+#tokenSelEdit {
+  display: grid;
+  gap: 10px;
+}
+
+#tokenSelEdit.hidden {
+  display: none;
+}
+
+.tool-popover textarea {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  resize: vertical;
+}
+
+/* GM-only: a token's note, shown beside the cursor while hovering the token. */
+.token-note-tip {
+  background: rgba(6, 2, 28, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  max-width: 260px;
+  padding: 7px 10px;
+  pointer-events: none;
+  position: absolute;
+  white-space: pre-wrap;
+  z-index: 8;
+}
+
+.token-note-tip[hidden] {
+  display: none;
+}
+
 .player-fullscreen {
   align-items: center;
   background: rgba(25, 28, 29, 0.6);
