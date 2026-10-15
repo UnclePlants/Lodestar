@@ -143,6 +143,7 @@
     <li><a href="#images">Images, notes &amp; PDFs</a></li>
     <li><a href="#aoe">Area of effect</a></li>
     <li><a href="#measure">Measure &amp; ping</a></li>
+    <li><a href="#dice">Dice roller</a></li>
     <li><a href="#initiative">Initiative tracker</a></li>
     <li><a href="#music">Music &amp; sound</a></li>
     <li><a href="#rotate">Rotating &amp; the player frame</a></li>
@@ -248,6 +249,17 @@
     <img src="manual/tokens.jpg" alt="A selected image token ringed by eight step arrows, with a dashed path traced behind it and a label reading 4 sq · 20 ft; two bandit tokens and a Grease area nearby on a gridded courtyard.">
     <figcaption><b>Figure 6.</b> A selected token: the eight step arrows, its traced path, and the distance moved — two diagonals plus one straight step count as 4 squares (20 ft).</figcaption>
   </figure>
+  <h3>Edit a selected token</h3>
+  <p>When you select a token in Move mode, the token options open as <strong>Selected token</strong> and edit that token live: its colour, size, label, and image. Two extra fields appear:</p>
+  <ul>
+    <li><strong>Notes (GM only)</strong> — hit points, conditions, secrets. Hover the token to see its note beside the cursor. Notes never reach the player display.</li>
+    <li><strong>Hidden from players (stealth)</strong> — the token disappears from the player display entirely (it isn't even sent there) and shows translucent with a dashed ring on yours. Untick it when the rogue steps out of the shadows.</li>
+  </ul>
+  <p>All the edits you make to one selected token undo together with a single <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</p>
+  <figure>
+    <img src="manual/token-editor.jpg" alt="A translucent, hidden bandit token selected on the map with its step arrows; a tooltip beside it shows its GM note, and the Selected token panel shows colour, size, label, the note and a ticked Hidden from players checkbox.">
+    <figcaption><b>Figure 7.</b> Editing a selected token: a GM note (shown on hover) and hidden from the players.</figcaption>
+  </figure>
 </section>
 
 <section id="images">
@@ -260,7 +272,7 @@
   <p>The <strong>PDF</strong> button opens one or more local PDFs (character sheets, stat blocks, rules) in floating, draggable, resizable windows — GM-only. Use <strong>Swap</strong> to load a different file into a window, and <strong>×</strong> to close it. PDFs live only in the current tab: they're never synced to players or saved into a map.</p>
   <figure>
     <img src="manual/images-notes.jpg" alt="A tilted WANTED poster image on the map with its transform box (corner handles, rotation ball and a Show to players checkbox), and a beige GM-only note about the tea room.">
-    <figcaption><b>Figure 7.</b> A placed image with its transform box and a GM-only note.</figcaption>
+    <figcaption><b>Figure 8.</b> A placed image with its transform box and a GM-only note.</figcaption>
   </figure>
 </section>
 
@@ -276,7 +288,7 @@
   </ul>
   <figure>
     <img src="manual/aoe.jpg" alt="A translucent orange 30-foot cone projected from the raven token toward a bandit, over a green Grease marker, with the Area of Effect options card open.">
-    <figcaption><b>Figure 8.</b> A 30 ft cone template (mirrored to the players in real time) next to a placed <em>Grease</em> marker.</figcaption>
+    <figcaption><b>Figure 9.</b> A 30 ft cone template (mirrored to the players in real time) next to a placed <em>Grease</em> marker.</figcaption>
   </figure>
 </section>
 
@@ -286,6 +298,24 @@
     <li><strong>Measure</strong> — drag to measure distance; it reports grid cells and your choice of feet or metres. (If the map has its own printed grid and the overlay is off, calibrate the ruler with the drag-a-square button.)</li>
     <li><strong>Ping</strong> — hold <kbd>Alt</kbd> and click anywhere to drop an animated marker on both screens — great for "look here".</li>
   </ul>
+</section>
+
+<section id="dice">
+  <h2 class="sec">Dice roller <a class="top" href="#about">↑ top</a></h2>
+  <p>Click the <strong>d20 button</strong> in the bottom-right corner of the map (or press <kbd>D</kbd>) to open the dice tray. Real 3D dice tumble across the map, bounce off the edges and each other, and settle; the total then appears at the top of the screen with every die listed.</p>
+  <ul>
+    <li><strong>Build a roll</strong> by clicking dice on the pad — click d20 twice for <code>2d20</code>, then d6 for <code>2d20+1d6</code> — or type it: <code>1d20+5</code>, <code>3d8-1</code>, <code>d%</code>. <strong>Clear</strong> empties it. Press <kbd>Enter</kbd> or <strong>Roll</strong>.</li>
+    <li><strong>Adv</strong> / <strong>Dis</strong> roll the d20 twice and keep the higher / lower (<code>2d20kh1</code> / <code>2d20kl1</code>), keeping your modifiers. The dropped die stays on the table, dimmed, and is struck through in the result.</li>
+    <li>Keep or drop dice yourself with <code>kh</code>, <code>kl</code>, <code>dl</code> and <code>dh</code> — <code>4d6dl1</code> rolls ability scores.</li>
+    <li>Every die is a real 3D shape: d4, d6, d8, d10, d12, d20, and d100 (a tens die plus a units die). Unusual sizes like a d3 still roll, just without a 3D die.</li>
+    <li><strong>Players see the roll</strong>: tick it to throw the dice on the player display too — the very same tumble, landing on the same numbers. Leave it off for a <strong>secret roll</strong> that never leaves your screen (marked <em>GM only</em>).</li>
+    <li>Recent rolls are listed in the tray; click one to roll it again. Your dice colour, the sound switch, and the players-see setting are remembered.</li>
+  </ul>
+  <p>Results come from the dice physics themselves — whichever face ends up on top — and each throw is seeded with your browser's cryptographic random generator, so every face is equally likely.</p>
+  <figure>
+    <img src="manual/dice.jpg" alt="Three-dimensional red dice settled on the map: a d20 showing 15, a dimmed dropped d20 showing 4, and two d6 showing 4 and 2. A banner reads 24, 2d20kh1+2d6+3, GM only, and the dice tray is open on the right with the pad, the roll, options, and recent rolls.">
+    <figcaption><b>Figure 10.</b> A secret roll with advantage: the dropped d20 is dimmed, the total sits at the top, and the dice tray lists recent rolls.</figcaption>
+  </figure>
 </section>
 
 <section id="initiative">
@@ -307,7 +337,7 @@
   <p>Each row also has a small <strong>C</strong> button that marks a combatant as <strong>concentrating</strong> on a spell. Click it to toggle the state on or off — it lights up when active. The state mirrors as a small C badge next to the combatant's name in the order overlay, on both the GM and player screens.</p>
   <figure>
     <img src="manual/initiative.jpg" alt="The docked initiative panel listing Perrac, Bandit A and Bandit B with initiative scores and HP bars; Bandit B's turn is highlighted, its token on the map wears a glowing ring, and the compact order overlay sits in the bottom-left corner.">
-    <figcaption><b>Figure 9.</b> The initiative panel, the compact corner overlay, and the turn ring on the active combatant's token.</figcaption>
+    <figcaption><b>Figure 11.</b> The initiative panel, the compact corner overlay, and the turn ring on the active combatant's token.</figcaption>
   </figure>
 </section>
 
@@ -322,7 +352,7 @@
   <p>Everything is mirrored to the player display, so the table hears it too. Because browsers block audio until the window has been clicked, the first time a track starts the player display shows a one-time <strong>“Click to enable table audio”</strong> button — click it once and audio flows from then on. Loaded audio lives in this browser tab only; it is not bundled into saved maps.</p>
   <figure class="narrow">
     <img src="manual/music.jpg" alt="The music panel: two scene chips (Tea room selected, Ambush), a Music track and an Ambiance loop each with play, loop and volume controls, and an SFX row with a Loud Explosion pad.">
-    <figcaption><b>Figure 10.</b> The music panel with two saved scenes, both looping layers, and an SFX pad.</figcaption>
+    <figcaption><b>Figure 12.</b> The music panel with two saved scenes, both looping layers, and an SFX pad.</figcaption>
   </figure>
 </section>
 
@@ -335,7 +365,7 @@
   <p>Under the Player view controls you can hide the frame (<strong>Show player frame on GM screen</strong>) or change its <strong>colour</strong> and <strong>opacity</strong> if red clashes with your map.</p>
   <figure>
     <img src="manual/player-frame.jpg" alt="The whole tea room map zoomed out on the GM screen, with a red dashed rectangle around the tea room showing the part the player display is framing.">
-    <figcaption><b>Figure 11.</b> Zoomed out on the GM screen, the red frame shows exactly what the players see; drag it to move their view.</figcaption>
+    <figcaption><b>Figure 13.</b> Zoomed out on the GM screen, the red frame shows exactly what the players see; drag it to move their view.</figcaption>
   </figure>
 </section>
 
@@ -354,7 +384,7 @@
   </div>
   <figure class="narrow">
     <img src="manual/player-view.jpg" alt="The Player view controls: a Follow GM switch (off), Match GM view and Fit player view buttons, rotate-player-view buttons, a ticked Lock square size on player screen (IRL TV) checkbox with its explanation, and the player frame show, colour and opacity settings.">
-    <figcaption><b>Figure 12.</b> The Player view controls, with the IRL square lock turned on.</figcaption>
+    <figcaption><b>Figure 14.</b> The Player view controls, with the IRL square lock turned on.</figcaption>
   </figure>
 </section>
 
@@ -388,6 +418,7 @@
     <tr><td><kbd>A</kbd></td><td>Area of effect</td></tr>
     <tr><td><kbd>M</kbd></td><td>Measure</td></tr>
     <tr><td><kbd>S</kbd></td><td>Stairs</td></tr>
+    <tr><td><kbd>D</kbd></td><td>Open / close the dice roller</td></tr>
     <tr><td><kbd>F</kbd></td><td>Fit map to screen (and fullscreen on the player window)</td></tr>
     <tr><td>Arrow keys</td><td>Pan the map (when no token is selected)</td></tr>
     <tr><td><kbd>+</kbd> · <kbd>-</kbd></td><td>Zoom in · out</td></tr>
