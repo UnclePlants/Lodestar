@@ -93,6 +93,8 @@
     min-height: 90px;
     width: 100%;
   }
+  /* Tall panel crops: show at their natural size, centred, instead of stretched full width. */
+  figure.narrow img { background: var(--bg); margin: 0 auto; max-width: min(100%, 340px); }
   figcaption {
     border-top: 1px solid var(--line);
     color: var(--muted);
@@ -169,7 +171,10 @@
     <li>In the top of the left panel, click the <strong>Load map</strong> button (the image icon) and pick a map from your computer: an image, an animated GIF, or a video (MP4 or WebM).</li>
     <li>The map appears. Use the mouse wheel to zoom and drag to pan. Press <kbd>F</kbd> (or click <strong>Fit</strong>) to frame the whole map.</li>
   </ol>
-  <p>The left panel is organised into collapsible sections (Grid, View, Player View, Floors, Map library). Click a section title to open or close it. You can hide the whole panel with the tab on the left edge of the map to give the map more room.</p>
+  <p>The left panel is organised into collapsible sections (Splash Screen, Grid, View, Floors, Map library). Click a section title to open or close it. You can hide the whole panel with the tab on the left edge of the map to give the map more room; the tab on the right edge does the same for the music and initiative column.</p>
+  <h3>Map files</h3>
+  <p>A map can be any image your browser opens (JPG, PNG, WebP…), an <strong>animated GIF</strong> (animated WebP and PNG work too), or a <strong>video</strong> (MP4 or WebM). Animated maps loop on both screens with fog, grid and tokens drawn on top, and videos stay in step between your screen and the players'. Untick <strong>Play animated map</strong> in the View section to freeze them. Videos play muted — use the <a href="#music">music player</a> for sound.</p>
+  <p>Want to look around first? Click <strong>Demo</strong> on the welcome screen to open a sample three-floor map with fog, tokens, initiative and music already set up.</p>
   <figure>
     <img src="manual/load-map.png" alt="Top of the left control panel showing the Load map, My maps, Save map and Open player display buttons.">
     <figcaption><b>Figure 2.</b> The top action buttons: load a map, open saved maps, save, and open the player display.</figcaption>
@@ -181,8 +186,8 @@
   <p>Click <strong>Open player display</strong> (the monitor icon at the top of the panel). A second window opens — drag it onto your TV or second monitor and press <kbd>F</kbd> (or double-click) to make it fullscreen.</p>
   <p>The player window shows the same map, but with fog as solid black and none of your GM-only tools. By default it follows your view; a <strong>red dashed rectangle</strong> on your GM screen shows exactly what the players are currently seeing.</p>
   <ul>
-    <li><strong>Follow GM</strong> (Player View section): when on, the player screen mirrors your pan/zoom. Turn it off to frame the players' view independently.</li>
-    <li><strong>Match GM view</strong> snaps the player view to your current framing once.</li>
+    <li><strong>Follow GM</strong> (the Player view controls in the View section): when on, the player screen mirrors your pan/zoom. Turn it off to frame the players' view independently with the zoom and position sliders.</li>
+    <li><strong>Match GM view</strong> snaps the player view to your current framing once; <strong>Fit player view</strong> fits the whole map to the player screen.</li>
     <li>You can drag the red frame itself to pan the players' view without moving your own (see <a href="#rotate">Rotating &amp; the player frame</a>).</li>
   </ul>
   <figure>
@@ -198,7 +203,8 @@
     <li><strong>Zoom:</strong> mouse wheel.</li>
     <li><strong>Fit to screen:</strong> press <kbd>F</kbd> or click the fit button.</li>
     <li><strong>Map image size</strong> (View section) scales the whole map up or down if your source image is very small or very large.</li>
-    <li><strong>Animated maps:</strong> GIF and video maps loop on both screens with fog, grid and tokens on top (videos are kept in step between your screen and the players'). Untick <strong>Play animated map</strong> (View section) to freeze them. Videos play muted; use the music player for sound.</li>
+    <li><strong>Animated maps:</strong> untick <strong>Play animated map</strong> (View section) to freeze a GIF or video map on both screens; tick it again to resume (see <a href="#start">Map files</a>).</li>
+    <li><strong>Arrow keys</strong> pan and <kbd>+</kbd> / <kbd>-</kbd> zoom whenever no token is selected.</li>
   </ul>
 </section>
 
@@ -225,10 +231,10 @@
     <li><strong>Right-click a polygon area</strong> to remove it and clear the brush/bucket fog inside it (other polygon areas are left alone).</li>
     <li><strong>Clear all fog</strong> empties everything.</li>
   </ul>
-  <p>On your GM screen fog shows as an adjustable tint so you can still see through it; players see solid black.</p>
+  <p>On your GM screen fog shows as an adjustable tint so you can still see through it; players see solid black. Every fog tool opens a small options card where you set that tint (<strong>GM tint</strong>) and how see-through it is (<strong>GM opacity</strong>). Named areas show their label on your screen only.</p>
   <figure>
-    <img src="manual/fog.png" alt="A battlemap with several fogged rooms, the GM seeing a translucent tint and the fog toolbar ribbon open.">
-    <figcaption><b>Figure 5.</b> Fogged areas (translucent for the GM) and the fog toolbar.</figcaption>
+    <img src="manual/fog.jpg" alt="The tea room's fogged rooms seen through a dark GM tint, with named labels, the fog ribbon open and the Fog Shape options card showing rectangle, square, ellipse, circle and triangle.">
+    <figcaption><b>Figure 5.</b> Fogged, named areas (tinted for the GM), the fog ribbon, and the Fog Shape options.</figcaption>
   </figure>
 </section>
 
@@ -237,9 +243,10 @@
   <p>Select the <strong>Tokens</strong> tool. Click to drop a token, drag to move it, right-click to remove it. In the token options you can set a colour, a 1–4 cell size, a short label, or load a custom image.</p>
   <p><strong>Bulk-add:</strong> use "Add image tokens" in the token options and multi-select several image files — Lodestar drops one token per image in a tidy grid for you to arrange.</p>
   <p>In <strong>Move</strong> mode you can <strong>drag a token to move it</strong>, or click it once to select it. A selected token shows <strong>eight pop-out orientation arrows</strong> — click one to step a cell in that direction, including diagonals; the keyboard arrow keys nudge it too (<kbd>Delete</kbd> removes it). As you step it, Lodestar <strong>traces the actual path</strong> and shows the <strong>distance moved</strong>, counted with the D&amp;D 5e alternating-diagonal rule (every other diagonal costs an extra square). Dragging with the mouse shows the distance as well. Tokens snap to the grid and appear on both screens.</p>
+  <p>Tokens linked to an initiative entry show a small HP bar under them on your screen only, so monster health stays hidden from the table (see <a href="#initiative">Initiative tracker</a>).</p>
   <figure>
-    <img src="manual/tokens.png" alt="Several coloured and image tokens placed on a gridded map, with the token options popover open.">
-    <figcaption><b>Figure 6.</b> Tokens on the grid and the token options.</figcaption>
+    <img src="manual/tokens.jpg" alt="A selected image token ringed by eight step arrows, with a dashed path traced behind it and a label reading 4 sq · 20 ft; two bandit tokens and a Grease area nearby on a gridded courtyard.">
+    <figcaption><b>Figure 6.</b> A selected token: the eight step arrows, its traced path, and the distance moved — two diagonals plus one straight step count as 4 squares (20 ft).</figcaption>
   </figure>
 </section>
 
@@ -252,17 +259,24 @@
   <h3>PDF resources</h3>
   <p>The <strong>PDF</strong> button opens one or more local PDFs (character sheets, stat blocks, rules) in floating, draggable, resizable windows — GM-only. Use <strong>Swap</strong> to load a different file into a window, and <strong>×</strong> to close it. PDFs live only in the current tab: they're never synced to players or saved into a map.</p>
   <figure>
-    <img src="manual/images-notes.png" alt="A map with a placed image prop and a beige GM-only sticky note.">
+    <img src="manual/images-notes.jpg" alt="A tilted WANTED poster image on the map with its transform box (corner handles, rotation ball and a Show to players checkbox), and a beige GM-only note about the tea room.">
     <figcaption><b>Figure 7.</b> A placed image with its transform box and a GM-only note.</figcaption>
   </figure>
 </section>
 
 <section id="aoe">
   <h2 class="sec">Area of effect <a class="top" href="#about">↑ top</a></h2>
-  <p>The <strong>Area of effect</strong> tool shows a live spell template that follows your cursor on both screens — a <strong>circle</strong>, <strong>cube/square</strong>, or <strong>cone</strong>. Pick the shape and a size in feet (presets or a custom value), and choose a colour. The cone rotates with the <strong>mouse wheel</strong> or the direction slider. It's a preview that follows the cursor, not something you place.</p>
+  <p>The <strong>Area of effect</strong> tool shows a live spell template that follows your cursor on both screens — a <strong>circle</strong>, <strong>cube/square</strong>, or <strong>cone</strong>. Pick the shape and a size in feet (presets or a custom value), and choose a colour. The cone rotates with the <strong>mouse wheel</strong> or the direction slider.</p>
+  <h3>Leave an area on the map</h3>
+  <p>Hovering is for aiming; <strong>click</strong> to drop the area as a <strong>persistent marker</strong> — for a <em>Grease</em>, a wall of fire, or a lingering cloud. Lodestar asks for an optional label (GM-only). Markers stay put on both screens until you remove them:</p>
+  <ul>
+    <li><strong>Double-click</strong> a marker to edit its label.</li>
+    <li>In Move mode, <strong>click</strong> a marker to select it; the View section then shows its label and a <strong>Show to players</strong> switch, so you can keep a hidden trap's area to yourself.</li>
+    <li><strong>Right-click</strong> a marker (or select it and press <kbd>Delete</kbd>) to remove it.</li>
+  </ul>
   <figure>
-    <img src="manual/aoe.png" alt="A translucent cone area-of-effect template projected from a point on the battlemap.">
-    <figcaption><b>Figure 8.</b> A cone area-of-effect template, mirrored to the players in real time.</figcaption>
+    <img src="manual/aoe.jpg" alt="A translucent orange 30-foot cone projected from the raven token toward a bandit, over a green Grease marker, with the Area of Effect options card open.">
+    <figcaption><b>Figure 8.</b> A 30 ft cone template (mirrored to the players in real time) next to a placed <em>Grease</em> marker.</figcaption>
   </figure>
 </section>
 
@@ -290,10 +304,10 @@
     <li>The token of whoever's turn it is wears a glowing <strong>turn ring</strong> on the battlefield, so the table can see who's acting at a glance. The ring follows the same Players toggle as the order overlay.</li>
   </ul>
   <h3>Concentration</h3>
-  <p>Each row also has a small <strong>K</strong> button that marks a combatant as <strong>concentrating</strong> on a spell. Click it to toggle the state on or off — it lights up when active. The state mirrors as a small K badge next to the combatant's name in the order overlay, on both the GM and player screens.</p>
+  <p>Each row also has a small <strong>C</strong> button that marks a combatant as <strong>concentrating</strong> on a spell. Click it to toggle the state on or off — it lights up when active. The state mirrors as a small C badge next to the combatant's name in the order overlay, on both the GM and player screens.</p>
   <figure>
-    <img src="manual/initiative.png" alt="The docked initiative panel with several combatants and HP bars, plus the compact order overlay in the corner.">
-    <figcaption><b>Figure 9.</b> The initiative panel and the compact corner overlay.</figcaption>
+    <img src="manual/initiative.jpg" alt="The docked initiative panel listing Perrac, Bandit A and Bandit B with initiative scores and HP bars; Bandit B's turn is highlighted, its token on the map wears a glowing ring, and the compact order overlay sits in the bottom-left corner.">
+    <figcaption><b>Figure 9.</b> The initiative panel, the compact corner overlay, and the turn ring on the active combatant's token.</figcaption>
   </figure>
 </section>
 
@@ -306,17 +320,22 @@
     <li><strong>Scenes.</strong> Once the layers are loaded the way you like, press <strong>+ Scene</strong> to save that whole mix (both beds and the SFX set) under a name. Click a scene chip to recall it instantly (the beds swap in paused, ready to play). To remove one, select its chip and use the <strong>Delete</strong> button at the top of the panel — it only lights up once a scene is selected, so you can't delete one by accident.</li>
   </ul>
   <p>Everything is mirrored to the player display, so the table hears it too. Because browsers block audio until the window has been clicked, the first time a track starts the player display shows a one-time <strong>“Click to enable table audio”</strong> button — click it once and audio flows from then on. Loaded audio lives in this browser tab only; it is not bundled into saved maps.</p>
+  <figure class="narrow">
+    <img src="manual/music.jpg" alt="The music panel: two scene chips (Tea room selected, Ambush), a Music track and an Ambiance loop each with play, loop and volume controls, and an SFX row with a Loud Explosion pad.">
+    <figcaption><b>Figure 10.</b> The music panel with two saved scenes, both looping layers, and an SFX pad.</figcaption>
+  </figure>
 </section>
 
 <section id="rotate">
   <h2 class="sec">Rotating &amp; the player frame <a class="top" href="#about">↑ top</a></h2>
   <h3>Rotate the map</h3>
-  <p>In the View section, the <strong>Rotate map</strong> arrows turn the whole battlemap in 90° steps — fog, tokens, and stairs all rotate with it, and the players follow. You can also <strong>rotate just the player view</strong> (Player View section) so the map reads right-side-up from across the table, without rotating your own screen.</p>
+  <p>In the View section, the <strong>Rotate map</strong> arrows turn the whole battlemap in 90° steps — fog, tokens, and stairs all rotate with it, and the players follow. You can also <strong>rotate just the player view</strong> (Player view controls, further down the View section) so the map reads right-side-up from across the table, without rotating your own screen.</p>
   <h3>Drag the player frame to pan the TV</h3>
-  <p>The red dashed rectangle is what the players see. In Move mode you can <strong>grab it and drag it</strong> to pan the player display in real time — perfect for following the party around a large map without touching your own view.</p>
+  <p>The red dashed rectangle is what the players see. In Move mode you can <strong>grab it and drag it</strong> to pan the player display in real time — perfect for following the party around a large map without touching your own view. Dragging it switches <strong>Follow GM</strong> off for you.</p>
+  <p>Under the Player view controls you can hide the frame (<strong>Show player frame on GM screen</strong>) or change its <strong>colour</strong> and <strong>opacity</strong> if red clashes with your map.</p>
   <figure>
-    <img src="manual/player-frame.png" alt="The GM dragging the red player-view frame across a large map to reposition what the players see.">
-    <figcaption><b>Figure 10.</b> Drag the red frame to move the players' view around the map.</figcaption>
+    <img src="manual/player-frame.jpg" alt="The whole tea room map zoomed out on the GM screen, with a red dashed rectangle around the tea room showing the part the player display is framing.">
+    <figcaption><b>Figure 11.</b> Zoomed out on the GM screen, the red frame shows exactly what the players see; drag it to move their view.</figcaption>
   </figure>
 </section>
 
@@ -327,27 +346,31 @@
     <li>Open the player display and put it fullscreen on the TV.</li>
     <li>Turn <strong>Follow GM</strong> off so the TV has its own framing.</li>
     <li>Zoom the player view until one grid square on the TV matches the footprint of your minis.</li>
-    <li>Tick <strong>Lock square size on player screen (IRL TV)</strong> in the Player View section.</li>
+    <li>Tick <strong>Lock square size on player screen (IRL TV)</strong> in the Player view controls (View section).</li>
   </ol>
   <p>From then on, the square stays that exact physical size <strong>across maps</strong>. Different maps have different resolutions, so when you load a new one you just <a href="#grid">calibrate its grid</a> (drag a square over one cell) and the player zoom adjusts itself automatically — your minis always match. The setting is remembered between sessions. Drag the red frame to slide the visible area around as the party moves.</p>
-  <figure>
-    <img src="manual/irl-tv.png" alt="A TV laid flat on a table showing a Lodestar map with physical miniatures standing on the grid squares.">
-    <figcaption><b>Figure 11 (optional).</b> A flat TV as the battlemap with physical minis on the locked-size grid.</figcaption>
+  <div class="callout tip">
+    <p><strong>Tip:</strong> use <strong>Rotate player view only</strong> so the map reads the right way up for the players on the far side of the table, while your laptop keeps its own orientation.</p>
+  </div>
+  <figure class="narrow">
+    <img src="manual/player-view.jpg" alt="The Player view controls: a Follow GM switch (off), Match GM view and Fit player view buttons, rotate-player-view buttons, a ticked Lock square size on player screen (IRL TV) checkbox with its explanation, and the player frame show, colour and opacity settings.">
+    <figcaption><b>Figure 12.</b> The Player view controls, with the IRL square lock turned on.</figcaption>
   </figure>
 </section>
 
 <section id="floors">
   <h2 class="sec">Floors, stairs &amp; splash <a class="top" href="#about">↑ top</a></h2>
-  <ul>
-    <li><strong>Multi-floor:</strong> build multi-level locations — each floor has its own map, fog, tokens, and images. Use the ↑ / ↓ arrows in the map area to switch floors.</li>
-    <li><strong>Stairs:</strong> once you have at least two floors, place GM-only staircase markers that link them — click a stair to jump to the floor it leads to. Their colour is adjustable in the Floors section; players never see them.</li>
-    <li><strong>Splash / blackout:</strong> show a splash image or a plain black screen on the player display instead of the map — handy between scenes.</li>
-  </ul>
+  <h3>Floors</h3>
+  <p>Build multi-level locations — a cellar, the ground floor, the roof — where each floor has its own map, fog, tokens, images, notes and view. In the <strong>Floors</strong> section, use <strong>Add above</strong> / <strong>Add below</strong> to create a floor, give it a <strong>name</strong>, and load its map as usual. Switch floors with the <strong>↑ / ↓</strong> widget in the top-right of the map (it shows e.g. <em>2 / 3</em>); the player display follows you. <strong>Delete this floor</strong> removes the current one.</p>
+  <h3>Stairs</h3>
+  <p>Once you have at least two floors, pick the <strong>Stairs</strong> tool (<kbd>S</kbd>) and click the map. Choose which floor it <strong>leads to</strong> and, optionally, a short label (“To Sewers”). The marker shows an up or down arrow depending on direction. In Move mode, <strong>click a stair to jump</strong> to its floor; right-click it to remove it. Stairs are GM-only — players never see them — and their colour is set in the Floors section.</p>
+  <h3>Splash &amp; blackout</h3>
+  <p>Load a title card or handout in the <strong>Splash Screen</strong> section, then tick <strong>Splash</strong> (under the toolbar) to show it full-screen on the player display instead of the map — handy between scenes. <strong>Blackout</strong> shows a plain black screen instead. Your own screen keeps showing the map either way.</p>
 </section>
 
 <section id="saving">
   <h2 class="sec">Saving &amp; backups <a class="top" href="#about">↑ top</a></h2>
-  <p>Click <strong>Save map</strong> to store the whole setup (image, grid, fog, tokens, floors, views) in your browser's local library, and <strong>My maps</strong> to load one back.</p>
+  <p>Click <strong>Save map</strong> to store the whole setup (map image or video, grid, fog, tokens, images, notes, floors, views) in your browser's local library under a name; saving again with the same name updates it. Click <strong>My maps</strong> to see your saved maps, newest first, and <strong>Load</strong> or <strong>Delete</strong> one.</p>
   <div class="callout">
     <p>Everything is stored in <strong>your browser on your computer</strong> — nothing is uploaded. Because of that, a saved library only appears in the same browser, on the same device, at the same address you saved it from. Clearing your browser's site data erases it.</p>
   </div>
@@ -370,9 +393,15 @@
     <tr><td><kbd>+</kbd> · <kbd>-</kbd></td><td>Zoom in · out</td></tr>
     <tr><td><kbd>[</kbd> · <kbd>]</kbd></td><td>Brush size down · up</td></tr>
     <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Undo · Redo</td></tr>
+    <tr><td>Arrow keys</td><td>Nudge the selected token one cell (diagonals via its pop-out arrows)</td></tr>
+    <tr><td><kbd>Delete</kbd></td><td>Remove the selected token, image, or AoE marker</td></tr>
+    <tr><td><kbd>Enter</kbd> · <kbd>Esc</kbd></td><td>Finish · cancel the fog area you're drawing</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Backspace</kbd></td><td>While drawing a fog area: remove the last corner</td></tr>
+    <tr><td><kbd>?</kbd></td><td>Open the shortcut cheatsheet</td></tr>
     <tr><td><kbd>Alt</kbd>+click</td><td>Ping</td></tr>
     <tr><td>Middle-mouse drag</td><td>Pan in any tool</td></tr>
-    <tr><td>Right-click</td><td>Delete a token, fog area, image, or stair</td></tr>
+    <tr><td>Double-click</td><td>Edit an AoE marker's label</td></tr>
+    <tr><td>Right-click</td><td>Delete a token, fog area, image, AoE marker, or stair</td></tr>
   </table>
 </section>
 

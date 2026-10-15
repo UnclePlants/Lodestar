@@ -1,6 +1,6 @@
 # Lodestar
 
-**▶️ [Try it live](https://lodestarvtt.com)** — runs instantly in your browser, no install.
+**▶️ [Try it live](https://lodestarvtt.com)** — runs instantly in your browser, no install. · **📖 [User manual](https://lodestarvtt.com/manual.html)** — every tool, with pictures.
 
 A local-first battlemap display tool for game masters. Cast a map with fog of war to a second "player" screen while you control everything from a private GM panel. Lodestar runs entirely in the browser with **no build step and no dependencies** — open `index.html` and go. It's structured so it can later be wrapped as a desktop app (Electron, Tauri, or WebView2).
 
@@ -15,9 +15,11 @@ A local-first battlemap display tool for game masters. Cast a map with fog of wa
 ## Features
 
 - **Maps** — load high-resolution map images, animated GIFs (or animated WebP/PNG), or video maps (MP4/WebM) from local disk; pan and zoom freely. Animated maps loop on both screens beneath the fog, grid, and tokens (videos stay in step between the GM and player screens); a *Play animated map* switch in View pauses them. Videos play muted (use the music player for table audio).
-- **Player display** — open a second window, drag it to another screen, and cast the map to your players. The player window can go fullscreen. You drive the player's framing from the GM panel — match the GM view, fit the map to the player screen, set zoom/position, or rotate the player view independently. A red frame (color and opacity adjustable) on the GM screen shows exactly what the players currently see.
-- **Initiative tracker** — a dockable turn-order panel: add players, NPCs, and monsters with initiative and HP, advance turns and rounds, track damage/healing with HP bars. A compact order overlay can be shown in the corner of the GM screen and/or the player display independently; it stays put when the panel is closed and has its own turn arrows so you can advance the round without reopening the panel; each row also has a **C** toggle to mark a combatant as concentrating, mirrored as a badge in the order overlay for GM and players alike.
-- **Area of effect** — hover a live spell template (circle, square, or cone) over the map in any color and size; it mirrors to the player display in real time. The cone rotates with the mouse wheel or a direction slider.
+- **Player display** — open a second window, drag it to another screen, and cast the map to your players. The player window can go fullscreen. You drive the player's framing from the GM panel — match the GM view, fit the map to the player screen, set zoom/position, or rotate the player view independently. A red frame (color and opacity adjustable) on the GM screen shows exactly what the players currently see; drag it to pan the player display without moving your own view.
+- **In-person play on a TV** — lay a TV flat as the battlemap, zoom until one grid square matches your minis, and lock the square size: it then stays the same physical size across every map (re-derived from each map's calibrated grid).
+- **Initiative tracker** — a dockable turn-order panel: add players, NPCs, and monsters with initiative and HP, advance turns and rounds, track damage/healing with HP bars. A compact order overlay can be shown in the corner of the GM screen and/or the player display independently; it stays put when the panel is closed and has its own turn arrows so you can advance the round without reopening the panel; each row also has a **C** toggle to mark a combatant as concentrating, mirrored as a badge in the order overlay for GM and players alike. Link a row to a token on the map: the active combatant's token wears a turn ring, and linked tokens show a GM-only HP bar.
+- **Area of effect** — hover a live spell template (circle, square, or cone) over the map in any color and size; it mirrors to the player display in real time. The cone rotates with the mouse wheel or a direction slider. Click to leave it on the map as a persistent marker (Grease, Wall of Fire…) with an optional GM-only label and a per-marker show-to-players toggle.
+- **Music & sound** — two looping layers (music + ambience) that play together, a one-shot SFX soundboard, and saved scenes that recall the whole mix; everything is mirrored to the player display so the table hears it.
 - **Fog of war**
   - Trace polygon areas, or name them with a GM-only label.
   - Drag-draw fog shapes (rectangle, square, ellipse, circle, triangle) for quick rooms.
@@ -31,18 +33,20 @@ A local-first battlemap display tool for game masters. Cast a map with fog of wa
 - **Stairs** — place GM-only staircase arrows (color adjustable in the Floors section) that link floors; they scale with the grid and zoom and are invisible to players.
 - **Rotate** — rotate the GM map in 90° steps (fog, tokens, and stairs all ride along, and the player follows), or rotate just the player display independently so it reads right-side up from across the table.
 - **Tokens** — drop, drag, label, color, size, or give them a custom image; they snap to the grid and appear on both displays. Bulk-add tokens by multi-selecting image files (one token per image). In Move mode, click a token to select it (or drag to move it). A selected token gets 8 pop-out orientation arrows for stepping in any direction (including diagonals), and the arrow keys nudge it too; both trace the actual path and show the distance moved with the 5e alternating-diagonal rule. Dragging shows the distance as well. Delete removes a selected token.
-- **Map images** — drag an image file onto the map (or use *Add image* in View) to place it; move, resize, and rotate it, optionally snap it to the grid, and toggle per-image whether players can see it (hidden from players by default).
-- **Notes** — drop GM-only floating notes on the map from View; drag to move, double-click to edit, Delete to remove. Notes never appear on the player display.
+- **Map images** — drag an image file onto the map (or use the image button in the map toolbar) to place it; move, resize, and rotate it, optionally snap it to the grid, and toggle per-image whether players can see it (hidden from players by default).
+- **Notes** — drop GM-only rich-text sticky notes on the map with the note tool; type straight into them (font, size, bold/italic/underline/strikethrough), drag the title strip to move, drag the corner to resize. Notes never appear on the player display.
+- **PDF resources** — open character sheets, stat blocks, or rules PDFs in floating, resizable GM-only windows beside the map.
 - **Grid** — toggle and adjust size, offset, color, opacity, and token snapping. Calibrate quickly by dragging a square over one cell: this sets the cell size *and* aligns the grid to that cell, so tokens snap onto a map's own printed grid even with the overlay off.
 - **Ping** — Alt+click draws an animated marker on both displays.
 - **Measure** — reports distance in grid cells and your choice of imperial (feet) or metric (meters). The same drag-a-square calibration sets the ruler scale, working whether or not the grid overlay is shown.
 - **Splash / blackout** — show a splash image or a plain black screen on the player display instead of the map.
-- **Library** — save full setups (image, grid, fog, tokens, floors, views) to a local IndexedDB library; export/import the whole library as JSON for backups or moving machines.
+- **Library** — save full setups (map image or video, grid, fog, tokens, floors, views) to a local IndexedDB library; export/import the whole library as JSON for backups or moving machines.
 - **Undo / redo** and **fit-to-screen**.
+- **Built-in help** — press `?` for the shortcut cheatsheet, which also links to the [user manual](https://lodestarvtt.com/manual.html). Click **Demo** on the welcome screen to open a ready-made three-floor map with fog, tokens, initiative, and music.
 
 ## Run
 
-Use the **[hosted version](https://lodestarvtt.com)**, or download the source and open `index.html` in a modern browser — both work identically and run fully offline once loaded. Load a map image, click **Open player display**, and move that window to your second screen (press **F** or double-click for fullscreen).
+Use the **[hosted version](https://lodestarvtt.com)**, or download the source and open `index.html` in a modern browser — both work identically and run fully offline once loaded. Load a map, click **Open player display**, and move that window to your second screen (press **F** or double-click for fullscreen).
 
 Use **Save map** to store the full setup in the local library and **My maps** to restore one. Use **Export** / **Import** in the GM panel to back the library up to a file.
 
@@ -61,7 +65,9 @@ For anything you want to keep, use **Export** in the GM panel to save your whole
 - Arrow keys pan the map · `+` / `-` zoom (when no token is selected)
 - **Middle-mouse drag** pans the map in any tool, so you never have to switch tools just to reposition.
 - Polygon mode: click corners, `Enter` to place, `Esc` to cancel. `Ctrl+Z` or `Backspace` removes just the last point you placed.
-- `Alt+click` anywhere to ping · right-click a token, fog area, or stair to delete it
+- With a token selected, arrow keys nudge it one cell · `Delete` removes the selected token, image, or AoE marker
+- `Alt+click` anywhere to ping · right-click a token, fog area, AoE marker, or stair to delete it · double-click an AoE marker to edit its label
+- `?` opens the in-app cheatsheet
 
 ## Coordinate model
 
