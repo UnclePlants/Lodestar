@@ -676,6 +676,7 @@ function setup() {
   canvas.addEventListener("pointerup", onPointerUp);
   canvas.addEventListener("pointercancel", onPointerUp);
   canvas.addEventListener("pointerleave", () => {
+    if (!isPlayer) updateTokenNoteTip(null);
     if (mode === "aoe" && !isPlayer && aoeTemplate.visible) {
       aoeTemplate.visible = false;
       renderAndSyncView();
@@ -814,6 +815,9 @@ function bindControls() {
   controls.stampTriangle?.addEventListener("click", () => setStampShape("triangle"));
   controls.tokenImage?.addEventListener("change", loadTokenImage);
   controls.tokenImageClear?.addEventListener("click", clearTokenImage);
+  // With a token selected in Move mode, the token fields edit that token live.
+  ["tokenColor", "tokenCells", "tokenLabel", "tokenNote"].forEach((name) => controls[name]?.addEventListener("input", editSelectedToken));
+  controls.tokenHidden?.addEventListener("change", editSelectedToken);
   controls.tokenBulk?.addEventListener("change", (event) => {
     bulkAddTokenImages(event.target.files);
     event.target.value = ""; // allow re-selecting the same files
@@ -1861,6 +1865,11 @@ function sanitizedState() {
   const clone = JSON.parse(JSON.stringify(rest));
   if (clone.splash) delete clone.splash.imageData;
   delete clone.notes; // floating notes are GM-only and never leave the GM window
+  // Hidden (stealth) tokens never leave the GM window either, and token notes are GM-only.
+  if (clone.tokens) {
+    // eslint-disable-next-line no-unused-vars
+    clone.tokens = clone.tokens.filter((t) => !t.hidden).map(({ note, ...t }) => t);
+  }
   // Send only player-visible markers; strip GM-only label field.
   if (clone.aoeMarkers) {
     clone.aoeMarkers = clone.aoeMarkers
@@ -2046,7 +2055,10 @@ function applyFogSnapshot(serialized) {
   state.images = data.images || [];
   state.notes = data.notes || [];
   state.aoeMarkers = data.aoeMarkers || [];
-  selectedImage = selectedNote = selectedAoeMarker = null;
+  // The arrays were just rebuilt, so any selection would point at a stale copy.
+  selectedToken = selectedImage = selectedNote = selectedAoeMarker = null;
+  tokenPath = null;
+  updateSelectionPanels();
   fogDirty = true;
 }
 function undo() {
@@ -3078,8 +3090,11 @@ function drawTokens() {
   const combatantById = {};
   if (!isPlayer) state.initiative.combatants.forEach((c) => (combatantById[c.id] = c));
   state.tokens.forEach((token) => {
+    if (isPlayer && token.hidden) return; // stealth tokens are GM-only (and never synced anyway)
     const r = tokenRadius(token);
+    const ghost = token.hidden ? 0.45 : 1; // the GM sees hidden tokens as translucent
     ctx.save();
+    ctx.globalAlpha = ghost;
     keepUpright(token.x, token.y, rot); // art + label stay upright when the map is rotated
     const img = getTokenImage(token.image);
     if (img && img.complete && img.naturalWidth) {
@@ -3102,9 +3117,9 @@ function drawTokens() {
       ctx.beginPath();
       tokenOutline(token, r);
       ctx.fillStyle = token.color || "#d6a94d";
-      ctx.globalAlpha = 0.95;
+      ctx.globalAlpha = 0.95 * ghost;
       ctx.fill();
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = ghost;
       ctx.lineWidth = lineW;
       ctx.strokeStyle = "rgba(0,0,0,0.65)";
       ctx.stroke();
@@ -3130,6 +3145,19 @@ function drawTokens() {
       ctx.lineWidth = Math.max(1, 2 / (curK * curMs));
       ctx.strokeStyle = "rgba(177,195,1,0.4)";
       ctx.stroke();
+    }
+    // Hidden from players: a dashed ring on top of the translucent token.
+    if (token.hidden) {
+      const u = 1 / (curK * curMs);
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.setLineDash([6 * u, 4 * u]);
+      ctx.beginPath();
+      tokenOutline(token, r + 2 * u);
+      ctx.lineWidth = Math.max(1, 2 * u);
+      ctx.strokeStyle = "#eef1ef";
+      ctx.stroke();
+      ctx.restore();
     }
     // Selection highlight (GM only): an accent outline around the active token.
     if (!isPlayer && token === selectedToken) {
@@ -3286,13 +3314,15 @@ function loadTokenImage(event) {
   reader.onerror = () => window.alert("Could not read that image file.");
   reader.onload = () => {
     downscaleImage(reader.result, TOKEN_IMAGE_MAX_EDGE, (data) => {
-      tokenImageData = data;
-      // If a token is selected in Move mode, re-skin it immediately; otherwise this image
+      // A token being edited (selected in Move mode) is re-skinned; otherwise this image
       // becomes the default for newly dropped tokens.
-      if (selectedToken) {
+      const token = editingToken();
+      if (token) {
         pushHistory();
-        selectedToken.image = tokenImageData;
+        token.image = data;
         renderAndSync();
+      } else {
+        tokenImageData = data;
       }
       updateTokenImagePreview();
     });
@@ -3302,21 +3332,107 @@ function loadTokenImage(event) {
 }
 
 function clearTokenImage() {
-  tokenImageData = "";
-  if (selectedToken && selectedToken.image) {
-    pushHistory();
-    selectedToken.image = "";
-    renderAndSync();
+  const token = editingToken();
+  if (token) {
+    if (token.image) {
+      pushHistory();
+      token.image = "";
+      renderAndSync();
+    }
+  } else {
+    tokenImageData = "";
   }
   updateTokenImagePreview();
 }
 
 function updateTokenImagePreview() {
   if (!controls.tokenImagePreview) return;
-  const has = Boolean(tokenImageData);
-  controls.tokenImagePreview.src = has ? tokenImageData : "";
-  controls.tokenImagePreview.classList.toggle("hidden", !has);
-  controls.tokenImageClear?.classList.toggle("hidden", !has);
+  const token = editingToken();
+  const src = token ? token.image || "" : tokenImageData;
+  controls.tokenImagePreview.src = src;
+  controls.tokenImagePreview.classList.toggle("hidden", !src);
+  controls.tokenImageClear?.classList.toggle("hidden", !src);
+}
+
+/* ---- selected-token editor ----
+A token selected in Move mode reuses the token popover as its editor: colour, size and label
+edit that token live, plus the selected-only fields (a GM note shown on hover, and hiding it
+from players). In Token mode the same fields are the defaults for new tokens, so those are
+stashed while a token is being edited and restored afterwards. */
+let tokenDefaults = null; // { color, cells, label } saved while the popover edits a token
+let tokenEditUndoFor = null; // token whose current edit session has already pushed an undo step
+
+function editingToken() {
+  if (isPlayer || mode !== "pan" || !selectedToken) return null;
+  return state.tokens.includes(selectedToken) ? selectedToken : null;
+}
+
+function syncTokenEditor() {
+  if (isPlayer || !controls.tokenOptions) return;
+  const token = editingToken();
+  if (token && !tokenDefaults) {
+    tokenDefaults = { color: controls.tokenColor.value, cells: controls.tokenCells.value, label: controls.tokenLabel.value };
+  } else if (!token && tokenDefaults) {
+    controls.tokenColor.value = tokenDefaults.color;
+    controls.tokenCells.value = tokenDefaults.cells;
+    controls.tokenLabel.value = tokenDefaults.label;
+    tokenDefaults = null;
+  }
+  if (token !== tokenEditUndoFor) tokenEditUndoFor = null;
+  controls.tokenOptions.classList.toggle("hidden", mode !== "token" && !token);
+  controls.tokenSelEdit?.classList.toggle("hidden", !token);
+  // Bulk-adding new tokens (and its long how-to hint) don't apply while editing one token.
+  controls.tokenBulk?.closest("label")?.classList.toggle("hidden", !!token);
+  controls.tokenOptions.querySelector(":scope > .hint")?.classList.toggle("hidden", !!token);
+  if (controls.tokenPanelHeading) controls.tokenPanelHeading.textContent = token ? "Selected token" : "Token";
+  if (token) {
+    controls.tokenColor.value = token.color || "#d6a94d";
+    controls.tokenCells.value = token.cells || 1;
+    controls.tokenLabel.value = token.label || "";
+    if (controls.tokenNote) controls.tokenNote.value = token.note || "";
+    if (controls.tokenHidden) controls.tokenHidden.checked = !!token.hidden;
+  }
+  updateTokenImagePreview();
+}
+
+function editSelectedToken() {
+  const token = editingToken();
+  if (!token) return; // in Token mode the fields only set defaults for new tokens
+  if (tokenEditUndoFor !== token) {
+    pushHistory(); // one undo step per editing session, not per keystroke
+    tokenEditUndoFor = token;
+  }
+  token.color = controls.tokenColor.value;
+  token.cells = Number(controls.tokenCells.value) || 1;
+  token.label = controls.tokenLabel.value.trim();
+  const note = controls.tokenNote?.value || "";
+  if (note.trim()) token.note = note;
+  else delete token.note;
+  if (controls.tokenHidden?.checked) token.hidden = true;
+  else delete token.hidden;
+  renderAndSync();
+}
+
+// GM-only: a token's note pops up beside the cursor while hovering it in Move mode.
+let tokenNoteTip = null;
+
+function updateTokenNoteTip(event) {
+  const token = event && mode === "pan" && !isDragging ? hitToken(toNativePoint(event)) : null;
+  const text = token?.note || "";
+  if (!text) {
+    if (tokenNoteTip) tokenNoteTip.hidden = true;
+    return;
+  }
+  if (!tokenNoteTip) {
+    tokenNoteTip = document.createElement("div");
+    tokenNoteTip.className = "token-note-tip";
+    canvas.parentElement.appendChild(tokenNoteTip);
+  }
+  const p = clientToCanvasPoint(event);
+  tokenNoteTip.textContent = text;
+  tokenNoteTip.style.left = `${p.x + 16}px`;
+  tokenNoteTip.style.top = `${p.y + 16}px`;
+  tokenNoteTip.hidden = false;
 }
 
 function nudgeSelectedToken(key) {
@@ -3876,6 +3992,7 @@ function addImageFile(file, nx, ny) {
 function updateSelectionPanels() {
   if (isPlayer) return;
   syncImageHandles(); // the selected image's on-canvas transform box
+  syncTokenEditor();
   if (controls.aoeMarkerSelPanel) {
     controls.aoeMarkerSelPanel.classList.toggle("hidden", !selectedAoeMarker);
     if (selectedAoeMarker) {
@@ -3896,8 +4013,12 @@ function deleteTokenOrRoom(native) {
   const token = hitToken(native);
   if (token) {
     pushHistory();
-    if (token === selectedToken) selectedToken = null;
     state.tokens = state.tokens.filter((item) => item !== token);
+    if (token === selectedToken) {
+      selectedToken = null;
+      tokenPath = null;
+      updateSelectionPanels();
+    }
     renderAndSync();
     return true;
   }
@@ -5138,6 +5259,7 @@ function onPointerMove(event) {
   // Player display is view-only.
   if (isPlayer) return;
 
+  updateTokenNoteTip(event);
   if (!isDragging) {
     if (["brush", "eraser"].includes(mode)) render(); // live tool preview
     if (mode === "aoe" && state.imageData) {
@@ -5435,6 +5557,7 @@ function onKeyDown(event) {
     state.tokens = state.tokens.filter((t) => t !== selectedToken);
     selectedToken = null;
     tokenPath = null;
+    updateSelectionPanels();
     renderAndSync();
     return;
   }
