@@ -42,8 +42,8 @@
 
         <section class="control-section">
           <div class="top-actions">
-            <label class="top-action file-loader" title="Load map image" aria-label="Load map image">
-              <input id="mapUpload" type="file" accept="image/*">
+            <label class="top-action file-loader" title="Load map (image, GIF or video)" aria-label="Load map image, GIF or video">
+              <input id="mapUpload" type="file" accept="image/*,video/*">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/></svg>
             </label>
             <button id="loadLibrary" class="top-action empty" type="button" title="My maps" aria-label="My maps">
@@ -122,6 +122,10 @@
           <label>
             Map image size
             <input id="mapScale" type="range" min="0.25" max="3" step="0.01" value="1">
+          </label>
+          <label id="mapAnimateRow" class="checkbox-row hidden">
+            <input id="mapAnimate" type="checkbox" checked>
+            <span>Play animated map (GIF / video)</span>
           </label>
           <div class="field-with-action">
             <span class="calib-label">Rotate map (carries fog, tokens &amp; stairs)</span>
@@ -485,7 +489,7 @@
         <canvas id="battlemap" aria-label="Battlemap canvas"></canvas>
         <div class="empty-state" id="emptyState">
           <strong>No map loaded</strong>
-          <span>Load a local image from the GM panel.</span>
+          <span>Load a local image, GIF or video from the GM panel.</span>
         </div>
         <!-- GM-only rich-text sticky notes, layered over the canvas and tracking pan/zoom. -->
         <div id="noteLayer"></div>

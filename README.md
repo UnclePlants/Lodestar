@@ -14,7 +14,7 @@ A local-first battlemap display tool for game masters. Cast a map with fog of wa
 
 ## Features
 
-- **Maps** — load high-resolution map images from local disk; pan and zoom freely.
+- **Maps** — load high-resolution map images, animated GIFs (or animated WebP/PNG), or video maps (MP4/WebM) from local disk; pan and zoom freely. Animated maps loop on both screens beneath the fog, grid, and tokens (videos stay in step between the GM and player screens); a *Play animated map* switch in View pauses them. Videos play muted (use the music player for table audio).
 - **Player display** — open a second window, drag it to another screen, and cast the map to your players. The player window can go fullscreen. You drive the player's framing from the GM panel — match the GM view, fit the map to the player screen, set zoom/position, or rotate the player view independently. A red frame (color and opacity adjustable) on the GM screen shows exactly what the players currently see.
 - **Initiative tracker** — a dockable turn-order panel: add players, NPCs, and monsters with initiative and HP, advance turns and rounds, track damage/healing with HP bars. A compact order overlay can be shown in the corner of the GM screen and/or the player display independently; it stays put when the panel is closed and has its own turn arrows so you can advance the round without reopening the panel; each row also has a **C** toggle to mark a combatant as concentrating, mirrored as a badge in the order overlay for GM and players alike.
 - **Area of effect** — hover a live spell template (circle, square, or cone) over the map in any color and size; it mirrors to the player display in real time. The cone rotates with the mouse wheel or a direction slider.
@@ -69,7 +69,7 @@ Fog, rooms, tokens, pings, measures, and stairs are all stored in **native image
 
 ## Browser support
 
-Tested on current Chromium-based browsers (Chrome, Edge). Requires `BroadcastChannel`, `IndexedDB`, `ResizeObserver`, and Canvas 2D — all standard in modern browsers. The GM and player windows communicate over both `BroadcastChannel` and direct `window.postMessage`, so the cast works even when opened from `file://`.
+Tested on current Chromium-based browsers (Chrome, Edge). Requires `BroadcastChannel`, `IndexedDB`, `ResizeObserver`, and Canvas 2D — all standard in modern browsers. Animated GIF/WebP/PNG maps use `ImageDecoder` (WebCodecs); browsers without it show the first frame. Video maps play whatever formats the browser supports — MP4 (H.264) and WebM are the safe choices. The GM and player windows communicate over both `BroadcastChannel` and direct `window.postMessage`, so the cast works even when opened from `file://`.
 
 ## Credits
 
