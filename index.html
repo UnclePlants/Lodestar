@@ -38,25 +38,19 @@
         </svg>
         <p class="start-tagline">A battlemap display tool for game masters.</p>
         <div class="start-actions">
-          <div class="start-demo-wrap">
-            <!-- "Try it now" callout: a hand-drawn arrow that draws itself onto the demo button. -->
-            <div class="start-try" aria-hidden="true">
-              <span class="start-try-text">Try it now</span>
-              <svg class="start-try-arrow" viewBox="0 0 120 70">
-                <path class="start-try-line" pathLength="1" d="M8 9C30 2 58 4 78 16S102 38 108 50"/>
-                <path class="start-try-head" pathLength="1" d="M95 43.5 108 50 107 35.5"/>
-              </svg>
-            </div>
-            <button id="startDemo" class="start-btn start-btn-primary" type="button">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5Z"/></svg>
-              <span>Try the demo</span>
-            </button>
-          </div>
-          <button id="startEnter" class="start-btn start-btn-secondary" type="button" title="Open Lodestar (Enter)">
+          <button id="startEnter" class="start-btn start-btn-primary" type="button" title="Open Lodestar (Enter)">
             <span>Open Lodestar</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
           </button>
         </div>
+      </div>
+      <!-- The demo, tucked in the bottom-right corner with a "Try it now" label. -->
+      <div class="start-demo">
+        <span class="start-try-text" aria-hidden="true">Try it now</span>
+        <button id="startDemo" class="start-btn start-btn-demo" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5Z"/></svg>
+          <span>Try the demo</span>
+        </button>
       </div>
       <footer class="start-footer">
         <span>made by u/UnclePlants</span>
