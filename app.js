@@ -483,6 +483,9 @@ function setupStartScreen() {
   };
   const onStartKey = (event) => {
     if (document.getElementById("creditsDialog")?.open) return; // let the open dialog handle keys
+    // A focused button or link handles its own Enter/Space (so keyboard users can pick the
+    // demo or open the manual); otherwise Enter, Space or Escape opens the app.
+    if (event.key !== "Escape" && event.target?.closest?.("#startScreen button, #startScreen a")) return;
     if (event.key === "Enter" || event.key === "Escape" || event.key === " ") {
       event.preventDefault();
       dismiss();
@@ -546,7 +549,7 @@ function whenMapReady(capMs) {
 }
 
 function loadDemoMap(btn, dismiss) {
-  const original = btn ? btn.textContent : "";
+  const original = btn ? btn.innerHTML : ""; // icon + label, restored if loading fails
   if (btn) {
     btn.disabled = true;
     btn.classList.add("is-loading");
@@ -557,7 +560,7 @@ function loadDemoMap(btn, dismiss) {
     if (btn) {
       btn.disabled = false;
       btn.classList.remove("is-loading");
-      btn.textContent = original;
+      btn.innerHTML = original;
     }
   };
   ensureDemoData()

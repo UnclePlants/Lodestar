@@ -43,7 +43,7 @@ A local-first battlemap display tool for game masters. Cast a map with fog of wa
 - **Splash / blackout** — show a splash image or a plain black screen on the player display instead of the map.
 - **Library** — save full setups (map image or video, grid, fog, tokens, floors, views) to a local IndexedDB library; export/import the whole library as JSON for backups or moving machines.
 - **Undo / redo** and **fit-to-screen**.
-- **Built-in help** — press `?` for the shortcut cheatsheet, which also links to the [user manual](https://lodestarvtt.com/manual.html). Click **Demo** on the welcome screen to open a ready-made three-floor map with fog, tokens, initiative, and music.
+- **Built-in help** — press `?` for the shortcut cheatsheet, which also links to the [user manual](https://lodestarvtt.com/manual.html). Click **Try the demo** on the welcome screen to open a ready-made three-floor map with fog, tokens, initiative, and music.
 
 ## Run
 

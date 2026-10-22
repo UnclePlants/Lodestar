@@ -44,13 +44,21 @@ button:hover {
   border-color: #52605e;
 }
 
+/* ---- Welcome screen ----
+   A starfield (Lodestar: the guiding star) with a soft glow behind the logo, the pitch, the
+   two ways in, and three feature highlights. It scrolls instead of clipping on short screens. */
 .start-screen {
   align-items: center;
-  background: #06021c;
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 28%, rgba(177, 195, 1, 0.09), transparent 70%),
+    radial-gradient(ellipse 80% 50% at 50% 115%, rgba(127, 182, 166, 0.1), transparent 70%),
+    #06021c;
   display: flex;
+  flex-direction: column;
   inset: 0;
-  justify-content: center;
   opacity: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
   position: fixed;
   transition: opacity 0.45s ease;
   z-index: 100;
@@ -61,20 +69,111 @@ button:hover {
   pointer-events: none;
 }
 
+/* Two star layers twinkling out of step, fixed so they stay put if the content scrolls. They
+   fade toward the middle so they frame the content instead of speckling the text. */
+.start-screen::before,
+.start-screen::after {
+  content: "";
+  inset: 0;
+  -webkit-mask-image: radial-gradient(ellipse 50% 55% at 50% 45%, rgba(0, 0, 0, 0.12) 45%, #000 100%);
+  mask-image: radial-gradient(ellipse 50% 55% at 50% 45%, rgba(0, 0, 0, 0.12) 45%, #000 100%);
+  pointer-events: none;
+  position: fixed;
+  z-index: 0;
+}
+
+.start-screen::before {
+  animation: start-twinkle 7s ease-in-out infinite;
+  background:
+    radial-gradient(2px 2px at 11.3% 42.6%, rgba(255, 255, 255, 0.38), transparent),
+    radial-gradient(1.5px 1.5px at 34.5% 58.7%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 30% 76.3%, rgba(255, 255, 255, 0.73), transparent),
+    radial-gradient(2px 2px at 39.2% 8.8%, rgba(255, 255, 255, 0.52), transparent),
+    radial-gradient(3px 3px at 73.7% 80.9%, rgba(255, 255, 255, 0.44), transparent),
+    radial-gradient(1.5px 1.5px at 56% 15.6%, rgba(255, 255, 255, 0.57), transparent),
+    radial-gradient(2px 2px at 89.3% 93.4%, rgba(255, 255, 255, 0.82), transparent),
+    radial-gradient(1.5px 1.5px at 14% 72.3%, rgba(255, 255, 255, 0.39), transparent),
+    radial-gradient(2px 2px at 2.7% 46.5%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(2px 2px at 96.4% 43.8%, rgba(255, 255, 255, 0.76), transparent),
+    radial-gradient(2px 2px at 23.6% 68.9%, rgba(255, 255, 255, 0.75), transparent),
+    radial-gradient(1.5px 1.5px at 98.4% 56.2%, rgba(255, 255, 255, 0.75), transparent),
+    radial-gradient(2px 2px at 64.5% 43.6%, rgba(255, 255, 255, 0.59), transparent),
+    radial-gradient(2px 2px at 16.1% 29.2%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(3px 3px at 42.3% 88.1%, rgba(255, 255, 255, 0.63), transparent),
+    radial-gradient(2px 2px at 68% 33%, rgba(255, 255, 255, 0.58), transparent),
+    radial-gradient(1.5px 1.5px at 4.8% 86.1%, rgba(255, 255, 255, 0.79), transparent),
+    radial-gradient(1.5px 1.5px at 99% 78.3%, rgba(255, 255, 255, 0.38), transparent),
+    radial-gradient(1.5px 1.5px at 99.8% 27.7%, rgba(255, 255, 255, 0.44), transparent),
+    radial-gradient(3px 3px at 39.1% 19.4%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 44.1% 77.8%, rgba(255, 255, 255, 0.79), transparent),
+    radial-gradient(3px 3px at 90.1% 90.7%, rgba(255, 255, 255, 0.43), transparent),
+    radial-gradient(1.5px 1.5px at 49.7% 38.6%, rgba(255, 255, 255, 0.38), transparent),
+    radial-gradient(3px 3px at 76.1% 13.7%, rgba(255, 255, 255, 0.52), transparent),
+    radial-gradient(1.5px 1.5px at 93.2% 14.7%, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(2px 2px at 21% 25.1%, rgba(255, 255, 255, 0.75), transparent),
+    radial-gradient(2px 2px at 62.7% 45%, rgba(255, 255, 255, 0.77), transparent),
+    radial-gradient(1.5px 1.5px at 12.2% 62.5%, rgba(255, 255, 255, 0.75), transparent),
+    radial-gradient(1.5px 1.5px at 7.8% 49%, rgba(255, 255, 255, 0.87), transparent),
+    radial-gradient(1.5px 1.5px at 22.8% 70.3%, rgba(255, 255, 255, 0.89), transparent),
+    radial-gradient(3px 3px at 91.4% 71.8%, rgba(255, 255, 255, 0.88), transparent),
+    radial-gradient(2px 2px at 18% 12%, rgba(255, 255, 255, 0.76), transparent),
+    radial-gradient(1.5px 1.5px at 78.2% 54.2%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 16.3% 99.1%, rgba(255, 255, 255, 0.64), transparent);
+}
+
+.start-screen::after {
+  animation: start-twinkle 9s ease-in-out -4s infinite;
+  background:
+    radial-gradient(1.5px 1.5px at 6.9% 10%, rgba(255, 255, 255, 0.89), transparent),
+    radial-gradient(1.5px 1.5px at 53.6% 92.3%, rgba(255, 255, 255, 0.69), transparent),
+    radial-gradient(1.5px 1.5px at 69.3% 87.1%, rgba(255, 255, 255, 0.84), transparent),
+    radial-gradient(1.5px 1.5px at 36.1% 90.4%, rgba(255, 255, 255, 0.51), transparent),
+    radial-gradient(1.5px 1.5px at 5% 47.7%, rgba(255, 255, 255, 0.62), transparent),
+    radial-gradient(1.5px 1.5px at 93% 93.1%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 40.8% 72.8%, rgba(255, 255, 255, 0.86), transparent),
+    radial-gradient(2px 2px at 28.8% 77%, rgba(255, 255, 255, 0.81), transparent),
+    radial-gradient(3px 3px at 86.7% 91.5%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1.5px 1.5px at 9.4% 47.2%, rgba(255, 255, 255, 0.37), transparent),
+    radial-gradient(1.5px 1.5px at 23% 66.1%, rgba(255, 255, 255, 0.71), transparent),
+    radial-gradient(2px 2px at 60.6% 71.5%, rgba(255, 255, 255, 0.69), transparent),
+    radial-gradient(2px 2px at 43.7% 66.3%, rgba(255, 255, 255, 0.88), transparent),
+    radial-gradient(1.5px 1.5px at 92.1% 4.3%, rgba(255, 255, 255, 0.46), transparent),
+    radial-gradient(2px 2px at 52% 36.1%, rgba(255, 255, 255, 0.88), transparent),
+    radial-gradient(2px 2px at 9.2% 16.9%, rgba(255, 255, 255, 0.69), transparent),
+    radial-gradient(1.5px 1.5px at 63.2% 59.2%, rgba(255, 255, 255, 0.53), transparent),
+    radial-gradient(3px 3px at 24.6% 33.1%, rgba(255, 255, 255, 0.49), transparent),
+    radial-gradient(2px 2px at 24.5% 24.4%, rgba(255, 255, 255, 0.52), transparent),
+    radial-gradient(2px 2px at 89.3% 73.8%, rgba(255, 255, 255, 0.69), transparent),
+    radial-gradient(1.5px 1.5px at 90.3% 76.4%, rgba(255, 255, 255, 0.65), transparent),
+    radial-gradient(3px 3px at 40.2% 94.1%, rgba(255, 255, 255, 0.87), transparent),
+    radial-gradient(2px 2px at 46.5% 98.9%, rgba(255, 255, 255, 0.69), transparent),
+    radial-gradient(2px 2px at 87.5% 33.9%, rgba(255, 255, 255, 0.44), transparent),
+    radial-gradient(2px 2px at 54.3% 67%, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(2px 2px at 50.7% 13.8%, rgba(255, 255, 255, 0.81), transparent),
+    radial-gradient(1.5px 1.5px at 51.8% 20%, rgba(255, 255, 255, 0.75), transparent),
+    radial-gradient(3px 3px at 16.3% 54.7%, rgba(255, 255, 255, 0.47), transparent),
+    radial-gradient(1.5px 1.5px at 78.6% 18.1%, rgba(255, 255, 255, 0.75), transparent),
+    radial-gradient(1.5px 1.5px at 91.5% 80.6%, rgba(255, 255, 255, 0.8), transparent);
+}
+
 .start-inner {
   align-items: center;
   display: flex;
   flex-direction: column;
-  gap: 26px;
-  padding: 32px;
+  gap: 18px;
+  margin: auto 0; /* centred vertically, but scrolls rather than clipping when short */
+  max-width: 980px;
+  padding: 48px 24px 28px;
+  position: relative;
   text-align: center;
+  width: 100%;
+  z-index: 1;
 }
 
 .start-logo {
   animation: start-rise 0.7s ease 0.1s both;
   height: auto;
-  max-width: min(560px, 80vw);
-  width: 100%;
+  width: min(500px, 84vw);
 }
 
 .start-logo .lodestar-star {
@@ -83,48 +182,116 @@ button:hover {
   transform-origin: center;
 }
 
+.start-headline {
+  animation: start-rise 0.7s ease 0.3s both;
+  color: var(--text);
+  font-family: Garamond, "EB Garamond", "Adobe Garamond Pro", Georgia, "Times New Roman", serif;
+  font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  margin: 0;
+  max-width: 32ch;
+  text-wrap: balance;
+}
+
 .start-tagline {
-  animation: start-rise 0.7s ease 0.35s both;
+  animation: start-rise 0.7s ease 0.42s both;
   color: var(--muted);
   font-size: 1rem;
-  letter-spacing: 0.02em;
+  line-height: 1.55;
   margin: 0;
+  max-width: 62ch;
+  text-wrap: pretty;
 }
 
 .start-actions {
-  align-items: center;
+  align-items: flex-end;
+  animation: start-rise 0.7s ease 0.55s both;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+  margin-top: 22px;
 }
 
-.start-enter {
-  animation: start-rise 0.7s ease 0.55s both;
-  background: var(--accent);
-  border: 1px solid transparent;
-  border-radius: 10px;
-  color: #1b1508;
+.start-btn {
+  align-items: center;
+  border-radius: 12px;
+  display: inline-flex;
   font-size: 1.05rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  min-height: 52px;
-  padding: 0 48px;
+  gap: 10px;
+  justify-content: center;
+  letter-spacing: 0.02em;
+  min-height: 54px;
+  min-width: 210px;
+  padding: 0 28px;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 }
 
-.start-enter:hover {
+.start-btn svg {
+  fill: none;
+  height: 20px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  transition: transform 0.2s ease;
+  width: 20px;
+}
+
+.start-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* The way in for first-timers: filled, with a slow pulse to draw the eye. */
+.start-btn-primary {
+  animation: start-pulse 2.8s ease-out 2.6s infinite;
+  background: var(--accent);
+  border: 1px solid transparent;
+  box-shadow: 0 10px 28px rgba(177, 195, 1, 0.18);
+  color: #141805;
+}
+
+.start-btn-primary svg {
+  fill: currentColor;
+  stroke: none;
+}
+
+.start-btn-primary:hover {
   border-color: transparent;
   filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.start-btn-secondary {
+  background: #0d0930;
+  border: 1px solid #3a3566;
+  color: var(--text);
+}
+
+.start-btn-secondary:hover {
+  background: #121a3a;
+  border-color: var(--accent-2);
+  transform: translateY(-1px);
+}
+
+.start-btn-secondary:hover svg {
+  transform: translateX(3px);
 }
 
 /* Animated ellipsis while the demo bundle downloads ("Loading", "Loading.", …). */
-.start-enter.is-loading {
+.start-btn.is-loading {
   cursor: progress;
 }
 
-.start-enter.is-loading::after {
+.start-btn.is-loading::after {
   animation: loading-dots 1.2s steps(4, jump-none) infinite;
   content: "...";
   display: inline-block;
+  margin-left: -10px; /* cancel the icon gap */
   overflow: hidden;
   text-align: left;
   vertical-align: bottom;
@@ -138,59 +305,242 @@ button:hover {
   }
 }
 
-/* Demo button + the hand-drawn "Try it now" arrow pointing at its top-left corner. */
 .start-demo-wrap {
   display: inline-flex;
   position: relative;
 }
 
-.start-demo-wrap .start-enter {
-  animation-delay: 0.7s;
-}
-
-.start-demo-arrow {
-  height: auto;
+/* "Try it now": italic serif and a hand-drawn arrow that draws itself onto the demo button,
+   then nudges it every few seconds. Left of the button; above it on narrower screens. */
+.start-try {
+  animation: start-try-nudge 3.4s ease-in-out 2.8s infinite;
+  height: 86px;
   pointer-events: none;
   position: absolute;
-  width: 240px;
-  /* The arrowhead tip sits ~92% across / ~66% down the SVG, i.e. ~222px right / ~92px down
-     at this width; offsetting by that lands the tip on the button's top-left corner.
-     Nudge `left`/`top` to fine-tune. */
-  left: -222px;
-  top: -92px;
-  animation: start-rise 0.7s ease 0.9s both;
+  right: calc(100% - 2px);
+  top: -40px;
+  width: 168px;
 }
 
-.start-credit {
-  animation: start-fade 0.9s ease 0.9s both;
-  bottom: 24px;
-  color: var(--muted);
-  font-size: 0.82rem;
+.start-try-text {
+  animation: start-fade-in 0.5s ease 1.05s both;
+  color: var(--accent);
+  font-family: Garamond, "EB Garamond", "Adobe Garamond Pro", Georgia, "Times New Roman", serif;
+  font-size: 1.6rem;
+  font-style: italic;
+  font-weight: 600;
   left: 0;
-  letter-spacing: 0.03em;
-  margin: 0;
-  opacity: 0.7;
+  line-height: 1;
+  position: absolute;
+  top: 0;
+  transform: rotate(-7deg);
+  white-space: nowrap;
+}
+
+.start-try-arrow {
+  bottom: 0;
+  fill: none;
+  height: 62px;
+  overflow: visible;
   position: absolute;
   right: 0;
-  text-align: center;
+  stroke: var(--text);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.6;
+  width: 106px;
+}
+
+.start-try-line,
+.start-try-head {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.start-try-line {
+  animation: start-draw 0.7s ease-out 1.3s both;
+}
+
+.start-try-head {
+  animation: start-draw 0.25s ease-out 1.95s both;
+}
+
+.start-demo-note {
+  animation: start-rise 0.7s ease 0.65s both;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: -4px 0 0;
+}
+
+.start-features {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+  margin: 26px 0 0;
+  max-width: 900px;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.start-features li {
+  animation: start-rise 0.7s ease 0.75s both;
+  background: #0b0730;
+  border: 1px solid #221d4a;
+  border-radius: 14px;
+  display: grid;
+  gap: 4px 12px;
+  grid-template-columns: auto 1fr;
+  padding: 16px 18px;
+}
+
+.start-features li:nth-child(2) {
+  animation-delay: 0.85s;
+}
+
+.start-features li:nth-child(3) {
+  animation-delay: 0.95s;
+}
+
+.start-features svg {
+  fill: none;
+  grid-row: span 2;
+  height: 26px;
+  margin-top: 1px;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+  width: 26px;
+}
+
+.start-features strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.start-features span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.start-footer {
+  align-items: center;
+  animation: start-fade-in 0.9s ease 1s both;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  gap: 6px 22px;
+  justify-content: center;
+  padding: 10px 20px 22px;
+  position: relative;
+  z-index: 1;
+}
+
+.start-footer a,
+.start-credits-btn {
+  color: var(--muted);
+  text-decoration: none;
 }
 
 .start-credits-btn {
-  animation: start-fade 0.9s ease 0.9s both;
   background: none;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  bottom: 18px;
-  color: var(--muted);
-  font-size: 0.85rem;
-  padding: 8px 16px;
-  position: absolute;
-  right: 24px;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  min-height: 0;
+  padding: 0;
 }
 
+.start-footer a:hover,
 .start-credits-btn:hover {
-  border-color: var(--accent-2);
   color: var(--text);
+}
+
+.start-footer a:focus-visible,
+.start-credits-btn:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Narrower: the callout moves above the demo button so it can never be clipped. */
+@media (max-width: 860px) {
+  .start-demo-wrap {
+    align-items: center;
+    flex-direction: column;
+  }
+
+  .start-try {
+    align-items: center;
+    animation-name: start-try-bob;
+    display: flex;
+    gap: 2px;
+    height: auto;
+    margin-bottom: 4px;
+    position: static;
+    width: auto;
+  }
+
+  .start-try-text {
+    font-size: 1.4rem;
+    position: static;
+    transform: rotate(-4deg);
+  }
+
+  .start-try-arrow {
+    height: 27px;
+    position: static;
+    transform: rotate(32deg) translate(2px, 6px);
+    width: 46px;
+  }
+}
+
+/* Phones: buttons stack full-width, features become a single column. */
+@media (max-width: 640px) {
+  .start-inner {
+    gap: 16px;
+    padding-top: 36px;
+  }
+
+  .start-actions {
+    align-items: stretch;
+    flex-direction: column;
+    margin-top: 6px;
+    width: min(340px, 100%);
+  }
+
+  .start-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .start-features {
+    grid-template-columns: 1fr;
+    max-width: 440px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-screen *,
+  .start-screen::before,
+  .start-screen::after {
+    animation: none !important;
+  }
+
+  .start-try-line,
+  .start-try-head {
+    stroke-dashoffset: 0;
+  }
+
+  .start-btn,
+  .start-btn svg {
+    transition: none;
+  }
 }
 
 @keyframes start-rise {
@@ -204,12 +554,66 @@ button:hover {
   }
 }
 
-@keyframes start-fade {
+@keyframes start-fade-in {
   from {
     opacity: 0;
   }
   to {
-    opacity: 0.7;
+    opacity: 1;
+  }
+}
+
+@keyframes start-twinkle {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes start-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes start-try-nudge {
+  0%,
+  72%,
+  100% {
+    transform: translate(0, 0);
+  }
+  82% {
+    transform: translate(7px, 3px);
+  }
+  91% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes start-try-bob {
+  0%,
+  72%,
+  100% {
+    transform: translateY(0);
+  }
+  82% {
+    transform: translateY(5px);
+  }
+  91% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes start-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(177, 195, 1, 0.45), 0 10px 28px rgba(177, 195, 1, 0.18);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 14px rgba(177, 195, 1, 0), 0 10px 28px rgba(177, 195, 1, 0.18);
   }
 }
 
