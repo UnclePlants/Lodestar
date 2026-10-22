@@ -508,7 +508,7 @@ function setupStartScreen() {
 
 /* ---- Welcome backdrop ----
 The Telarun map, muted to the night-sky blue and drifting slowly on a diagonal; journeys traced
-along its roads by a red dashed line (Indiana Jones style), one after another, forever: the line
+along its roads by a white dashed line (Indiana Jones style), one after another, forever: the line
 advances slowly behind a little guiding star and fades away behind itself as it goes; and a
 field of stars that each shimmer on their own. One canvas at ~30 fps, stopped as soon as the
 welcome screen goes. With reduced motion (which Windows also reports when its animation effects
@@ -651,14 +651,15 @@ function startWelcomeBackdrop(screen) {
   };
 
   // Next journey: a random one of those (nearly) as much on screen as any right now, setting out
-  // from a town neither of the last two did, and not just retracing the last one's steps.
+  // from a town neither of the last two did, nor where the last one's star is still resting, and
+  // not just retracing the last one's steps.
   const pickJourney = (X, Y, w, h) => {
     const onScreen = (j) => {
       const sample = j.pts.filter((p, i) => i % 2 === 0);
       return sample.filter((p) => X(p.x) > 30 && X(p.x) < w - 30 && Y(p.y) > 30 && Y(p.y) < h - 30).length / sample.length;
     };
     const fresh = journeys.filter(
-      (j) => !recent.some((r) => r.from === j.from) && !(recent[0]?.from === j.to && recent[0]?.to === j.from)
+      (j) => !recent.some((r) => r.from === j.from) && j.from !== recent[0]?.to && j.to !== recent[0]?.from
     );
     const options = (fresh.length ? fresh : journeys).map((j) => ({ j, seen: onScreen(j) }));
     const best = Math.max(...options.map((o) => o.seen));
@@ -666,8 +667,9 @@ function startWelcomeBackdrop(screen) {
     return pool[Math.floor(Math.random() * pool.length)].j;
   };
 
-  // One journey: dashes up to the head, each fading once it's been there for `life`, a ring at
-  // the start, the guiding star at the head, and an X when it arrives.
+  // One journey: white dashes up to the head, each fading once it's been there for `life`, a ring
+  // at the start, and the guiding star at the head, which rests at the destination and fades
+  // away with the last dashes.
   const drawTrip = (trip, t, X, Y, s) => {
     const { j } = trip;
     const elapsed = t - trip.start;
@@ -678,7 +680,7 @@ function startWelcomeBackdrop(screen) {
     };
     const period = 14 / s; // 8 px dash + 6 px gap on screen, in map px
     const dash = 8 / s;
-    g.strokeStyle = "#e0523f";
+    g.strokeStyle = "#ffffff";
     g.lineWidth = 2.6;
     g.lineCap = "round";
     g.lineJoin = "round";
@@ -703,20 +705,10 @@ function startWelcomeBackdrop(screen) {
       g.arc(X(j.pts[0].x), Y(j.pts[0].y), 5, 0, Math.PI * 2);
       g.stroke();
     }
-    if (head >= j.length) {
-      const end = j.pts[j.pts.length - 1];
-      const since = elapsed - (j.length / T.speed) * 1000;
-      const r = 6 * Math.min(1, since / 350);
-      g.globalAlpha = 0.95 * alphaAt(j.length);
-      g.beginPath();
-      g.moveTo(X(end.x) - r, Y(end.y) - r);
-      g.lineTo(X(end.x) + r, Y(end.y) + r);
-      g.moveTo(X(end.x) + r, Y(end.y) - r);
-      g.lineTo(X(end.x) - r, Y(end.y) + r);
-      g.stroke();
-    } else {
+    const starAlpha = head >= j.length ? alphaAt(j.length) : 1;
+    if (starAlpha > 0) {
       const p = journeyPointAt(j, head);
-      g.globalAlpha = 1;
+      g.globalAlpha = starAlpha;
       g.fillStyle = "#e3f05a";
       g.shadowColor = "rgba(214, 230, 74, 0.9)";
       g.shadowBlur = 10;
