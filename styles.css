@@ -101,19 +101,86 @@ button:hover {
 }
 
 .start-logo {
-  animation: start-rise 0.7s ease 0.1s both;
   height: auto;
+  overflow: visible;
   width: min(500px, 84vw);
 }
 
+/* The logo draws itself in: the compass ring's four arcs trace in one after another, the star
+   spins into place (overshooting a touch), and the word is revealed by a soft wipe from left to
+   right. Afterwards the star glows every few seconds and now and then swings a little, like a
+   compass needle settling. Everything else then fades in, in reading order. */
+.start-logo .lodestar-ring {
+  animation: start-draw 0.55s ease-out 0.15s both;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.start-logo .lodestar-ring:nth-of-type(3) {
+  animation-delay: 0.3s;
+}
+
+.start-logo .lodestar-ring:nth-of-type(4) {
+  animation-delay: 0.45s;
+}
+
+.start-logo .lodestar-ring:nth-of-type(5) {
+  animation-delay: 0.6s;
+}
+
 .start-logo .lodestar-star {
-  animation: start-glow 4s ease-in-out 0.8s infinite;
+  animation:
+    start-star-in 1.1s cubic-bezier(0.2, 0.9, 0.25, 1.15) 0.3s both,
+    start-glow 4s ease-in-out 1.6s infinite,
+    start-star-swing 9s ease-in-out 4s infinite;
   transform-box: fill-box;
   transform-origin: center;
 }
 
+.start-logo .lodestar-wipe {
+  animation: start-wipe 1.1s cubic-bezier(0.45, 0, 0.3, 1) 0.45s both;
+}
+
+@keyframes start-star-in {
+  from {
+    opacity: 0;
+    transform: rotate(-200deg) scale(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+}
+
+@keyframes start-star-swing {
+  0%,
+  78%,
+  100% {
+    transform: rotate(0);
+  }
+  84% {
+    transform: rotate(16deg);
+  }
+  90% {
+    transform: rotate(-8deg);
+  }
+  95% {
+    transform: rotate(3deg);
+  }
+}
+
+/* Slides the mask's white-to-clear gradient across the word (in the logo's own units). */
+@keyframes start-wipe {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(1300px);
+  }
+}
+
 .start-tagline {
-  animation: start-rise 0.7s ease 0.35s both;
+  animation: start-rise 0.8s ease 1.05s both;
   color: #c3c8d6;
   font-size: 1.05rem;
   letter-spacing: 0.03em;
@@ -123,7 +190,7 @@ button:hover {
 
 /* The main way in, centred under the tagline. */
 .start-actions {
-  animation: start-rise 0.7s ease 0.55s both;
+  animation: start-rise 0.8s ease 1.3s both;
   display: flex;
   justify-content: center;
   margin-top: 14px;
@@ -204,7 +271,7 @@ button:hover {
    pulse to catch the eye. On narrower screens it joins the flow below the main button. */
 .start-demo {
   align-items: center;
-  animation: start-rise 0.7s ease 0.85s both;
+  animation: start-rise 0.8s ease 1.65s both;
   bottom: 26px;
   display: flex;
   flex-direction: column;
@@ -238,7 +305,7 @@ button:hover {
 }
 
 .start-try-arrow {
-  animation: start-try-nudge 3.4s ease-in-out 2.8s infinite;
+  animation: start-try-nudge 3.4s ease-in-out 4s infinite;
   fill: none;
   filter: drop-shadow(0 1px 3px rgba(6, 2, 28, 0.95));
   height: 48px;
@@ -260,11 +327,11 @@ button:hover {
 }
 
 .start-try-line {
-  animation: start-draw 0.8s ease-out 1.4s both;
+  animation: start-draw 0.8s ease-out 2.3s both;
 }
 
 .start-try-head {
-  animation: start-draw 0.25s ease-out 2.15s both;
+  animation: start-draw 0.25s ease-out 3.05s both;
 }
 
 @keyframes start-draw {
@@ -289,7 +356,7 @@ button:hover {
 }
 
 .start-btn-demo {
-  animation: start-pulse 2.8s ease-out 2.4s infinite;
+  animation: start-pulse 2.8s ease-out 3.4s infinite;
   background: #0d0930;
   border: 1px solid var(--accent);
   color: var(--accent);
@@ -312,7 +379,7 @@ button:hover {
 
 .start-footer {
   align-items: center;
-  animation: start-fade-in 0.9s ease 1s both;
+  animation: start-fade-in 1s ease 1.9s both;
   color: var(--muted);
   display: flex;
   flex-wrap: wrap;
@@ -384,14 +451,25 @@ button:hover {
   }
 }
 
+/* Reduced motion (which Windows also reports when its animation effects are off): nothing
+   slides, spins, swings or pulses, but the welcome screen still fades in, the logo's ring still
+   draws itself and its word is still wiped in, as none of that moves anything around. */
 @media (prefers-reduced-motion: reduce) {
-  .start-screen * {
-    animation: none !important;
+  .start-tagline,
+  .start-actions,
+  .start-demo {
+    animation-name: start-fade-in;
   }
 
-  .start-try-line,
-  .start-try-head {
-    stroke-dashoffset: 0;
+  .start-logo .lodestar-star {
+    animation:
+      start-fade-in 0.9s ease 0.3s both,
+      start-glow 4s ease-in-out 1.6s infinite;
+  }
+
+  .start-try-arrow,
+  .start-btn-demo {
+    animation: none;
   }
 
   .start-btn,

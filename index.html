@@ -20,20 +20,37 @@
   </head>
   <body>
     <div class="start-screen" id="startScreen">
-      <!-- Backdrop (drawn by app.js): the Telarun map drifting under the stars, a dotted route
-           tracing across it, and a vignette keeping the centre calm for the logo and buttons. -->
+      <!-- Backdrop (drawn by app.js): the Telarun map in slow shots under the stars and clouds,
+           a dashed route tracing its roads, and a vignette keeping the centre calm for the logo
+           and buttons. -->
       <canvas class="start-backdrop" aria-hidden="true"></canvas>
       <div class="start-vignette" aria-hidden="true"></div>
       <div class="start-inner">
+        <!-- The logo draws itself in (see styles.css): the ring's arcs trace in, the star spins
+             into place, and the word is revealed by a soft wipe (the mask's gradient sliding
+             right). -->
         <svg class="start-logo" viewBox="0 0 1164 348" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lodestar">
+          <defs>
+            <linearGradient id="startLogoWipeEdge" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0.47" stop-color="#fff"/>
+              <stop offset="0.5" stop-color="#fff" stop-opacity="0"/>
+            </linearGradient>
+            <!-- The band starts just left of the "L" (clear from x 700) and slides 1300 units right,
+                 ending white from x -200 to 1868: past both ends of the word. -->
+            <mask id="startLogoWipe" maskUnits="userSpaceOnUse" x="643" y="806" width="1164" height="348">
+              <rect class="lodestar-wipe" x="-1500" y="806" width="4400" height="348" fill="url(#startLogoWipeEdge)"/>
+            </mask>
+          </defs>
           <g transform="translate(-643 -806)">
-            <text fill="#B1C301" font-family="Garamond, 'EB Garamond', 'Adobe Garamond Pro', Georgia, 'Times New Roman', serif" font-weight="700" font-size="165" x="742.149" y="1008">L</text>
-            <text fill="#B1C301" font-family="Garamond, 'EB Garamond', 'Adobe Garamond Pro', Georgia, 'Times New Roman', serif" font-weight="700" font-size="165" x="1068" y="1008">DESTAR</text>
+            <g mask="url(#startLogoWipe)">
+              <text fill="#B1C301" font-family="Garamond, 'EB Garamond', 'Adobe Garamond Pro', Georgia, 'Times New Roman', serif" font-weight="700" font-size="165" x="742.149" y="1008">L</text>
+              <text fill="#B1C301" font-family="Garamond, 'EB Garamond', 'Adobe Garamond Pro', Georgia, 'Times New Roman', serif" font-weight="700" font-size="165" x="1068" y="1008">DESTAR</text>
+            </g>
             <path class="lodestar-star" d="M857 955.5 944.595 946.047 954 858 963.405 946.047 1051 955.5 963.405 964.953 954 1053 944.595 964.953Z" fill="#B1C301" fill-rule="evenodd"/>
-            <path d="M970.124 879.081C1001.59 885.514 1025.89 910.575 1031.36 942.222" stroke="#FFFFFF" stroke-width="6.875" stroke-miterlimit="8" fill="none" fill-rule="evenodd"/>
-            <path d="M93.6243 1.58081C125.089 8.01389 149.394 33.0749 154.862 64.7217" stroke="#FFFFFF" stroke-width="6.875" stroke-miterlimit="8" fill="none" fill-rule="evenodd" transform="matrix(-1 0 0 1 1030.5 877.5)"/>
-            <path d="M936.876 1031.92C905.411 1025.49 881.106 1000.43 875.639 968.778" stroke="#FFFFFF" stroke-width="6.875" stroke-miterlimit="8" fill="none" fill-rule="evenodd"/>
-            <path d="M93.6243 1.58081C125.089 8.01389 149.394 33.0749 154.862 64.7217" stroke="#FFFFFF" stroke-width="6.875" stroke-miterlimit="8" fill="none" fill-rule="evenodd" transform="matrix(1 0 0 -1 875.5 1033.5)"/>
+            <path class="lodestar-ring" pathLength="1" d="M970.124 879.081C1001.59 885.514 1025.89 910.575 1031.36 942.222" stroke="#FFFFFF" stroke-width="6.875" stroke-miterlimit="8" fill="none" fill-rule="evenodd"/>
+            <path class="lodestar-ring" pathLength="1" d="M93.6243 1.58081C125.089 8.01389 149.394 33.0749 154.862 64.7217" stroke="#FFFFFF" stroke-width="6.875" stroke-miterlimit="8" fill="none" fill-rule="evenodd" transform="matrix(-1 0 0 1 1030.5 877.5)"/>
+            <path class="lodestar-ring" pathLength="1" d="M936.876 1031.92C905.411 1025.49 881.106 1000.43 875.639 968.778" stroke="#FFFFFF" stroke-width="6.875" stroke-miterlimit="8" fill="none" fill-rule="evenodd"/>
+            <path class="lodestar-ring" pathLength="1" d="M93.6243 1.58081C125.089 8.01389 149.394 33.0749 154.862 64.7217" stroke="#FFFFFF" stroke-width="6.875" stroke-miterlimit="8" fill="none" fill-rule="evenodd" transform="matrix(1 0 0 -1 875.5 1033.5)"/>
           </g>
         </svg>
         <p class="start-tagline">A battlemap display tool for game masters.</p>
