@@ -45,14 +45,11 @@ button:hover {
 }
 
 /* ---- Welcome screen ----
-   A starfield (Lodestar: the guiding star) with a soft glow behind the logo, the pitch, the
-   two ways in, and three feature highlights. It scrolls instead of clipping on short screens. */
+   Kept minimal: the logo, a one-line tagline and the two ways in, over a living backdrop (a
+   map drifting under shimmering stars). It scrolls instead of clipping on short screens. */
 .start-screen {
   align-items: center;
-  background:
-    radial-gradient(ellipse 60% 45% at 50% 28%, rgba(177, 195, 1, 0.09), transparent 70%),
-    radial-gradient(ellipse 80% 50% at 50% 115%, rgba(127, 182, 166, 0.1), transparent 70%),
-    #06021c;
+  background: #06021c;
   display: flex;
   flex-direction: column;
   inset: 0;
@@ -69,91 +66,24 @@ button:hover {
   pointer-events: none;
 }
 
-/* Two star layers twinkling out of step, fixed so they stay put if the content scrolls. They
-   fade toward the middle so they frame the content instead of speckling the text. */
-.start-screen::before,
-.start-screen::after {
-  content: "";
+/* The backdrop canvas (map, route and stars, drawn by app.js) and a vignette on top that
+   darkens the edges and keeps the middle calm behind the logo and buttons. Both stay fixed
+   if the content scrolls. */
+.start-backdrop,
+.start-vignette {
+  height: 100%;
   inset: 0;
-  -webkit-mask-image: radial-gradient(ellipse 50% 55% at 50% 45%, rgba(0, 0, 0, 0.12) 45%, #000 100%);
-  mask-image: radial-gradient(ellipse 50% 55% at 50% 45%, rgba(0, 0, 0, 0.12) 45%, #000 100%);
   pointer-events: none;
   position: fixed;
+  width: 100%;
   z-index: 0;
 }
 
-.start-screen::before {
-  animation: start-twinkle 7s ease-in-out infinite;
+.start-vignette {
   background:
-    radial-gradient(2px 2px at 11.3% 42.6%, rgba(255, 255, 255, 0.38), transparent),
-    radial-gradient(1.5px 1.5px at 34.5% 58.7%, rgba(255, 255, 255, 0.55), transparent),
-    radial-gradient(1.5px 1.5px at 30% 76.3%, rgba(255, 255, 255, 0.73), transparent),
-    radial-gradient(2px 2px at 39.2% 8.8%, rgba(255, 255, 255, 0.52), transparent),
-    radial-gradient(3px 3px at 73.7% 80.9%, rgba(255, 255, 255, 0.44), transparent),
-    radial-gradient(1.5px 1.5px at 56% 15.6%, rgba(255, 255, 255, 0.57), transparent),
-    radial-gradient(2px 2px at 89.3% 93.4%, rgba(255, 255, 255, 0.82), transparent),
-    radial-gradient(1.5px 1.5px at 14% 72.3%, rgba(255, 255, 255, 0.39), transparent),
-    radial-gradient(2px 2px at 2.7% 46.5%, rgba(255, 255, 255, 0.8), transparent),
-    radial-gradient(2px 2px at 96.4% 43.8%, rgba(255, 255, 255, 0.76), transparent),
-    radial-gradient(2px 2px at 23.6% 68.9%, rgba(255, 255, 255, 0.75), transparent),
-    radial-gradient(1.5px 1.5px at 98.4% 56.2%, rgba(255, 255, 255, 0.75), transparent),
-    radial-gradient(2px 2px at 64.5% 43.6%, rgba(255, 255, 255, 0.59), transparent),
-    radial-gradient(2px 2px at 16.1% 29.2%, rgba(255, 255, 255, 0.55), transparent),
-    radial-gradient(3px 3px at 42.3% 88.1%, rgba(255, 255, 255, 0.63), transparent),
-    radial-gradient(2px 2px at 68% 33%, rgba(255, 255, 255, 0.58), transparent),
-    radial-gradient(1.5px 1.5px at 4.8% 86.1%, rgba(255, 255, 255, 0.79), transparent),
-    radial-gradient(1.5px 1.5px at 99% 78.3%, rgba(255, 255, 255, 0.38), transparent),
-    radial-gradient(1.5px 1.5px at 99.8% 27.7%, rgba(255, 255, 255, 0.44), transparent),
-    radial-gradient(3px 3px at 39.1% 19.4%, rgba(255, 255, 255, 0.6), transparent),
-    radial-gradient(1.5px 1.5px at 44.1% 77.8%, rgba(255, 255, 255, 0.79), transparent),
-    radial-gradient(3px 3px at 90.1% 90.7%, rgba(255, 255, 255, 0.43), transparent),
-    radial-gradient(1.5px 1.5px at 49.7% 38.6%, rgba(255, 255, 255, 0.38), transparent),
-    radial-gradient(3px 3px at 76.1% 13.7%, rgba(255, 255, 255, 0.52), transparent),
-    radial-gradient(1.5px 1.5px at 93.2% 14.7%, rgba(255, 255, 255, 0.85), transparent),
-    radial-gradient(2px 2px at 21% 25.1%, rgba(255, 255, 255, 0.75), transparent),
-    radial-gradient(2px 2px at 62.7% 45%, rgba(255, 255, 255, 0.77), transparent),
-    radial-gradient(1.5px 1.5px at 12.2% 62.5%, rgba(255, 255, 255, 0.75), transparent),
-    radial-gradient(1.5px 1.5px at 7.8% 49%, rgba(255, 255, 255, 0.87), transparent),
-    radial-gradient(1.5px 1.5px at 22.8% 70.3%, rgba(255, 255, 255, 0.89), transparent),
-    radial-gradient(3px 3px at 91.4% 71.8%, rgba(255, 255, 255, 0.88), transparent),
-    radial-gradient(2px 2px at 18% 12%, rgba(255, 255, 255, 0.76), transparent),
-    radial-gradient(1.5px 1.5px at 78.2% 54.2%, rgba(255, 255, 255, 0.4), transparent),
-    radial-gradient(1.5px 1.5px at 16.3% 99.1%, rgba(255, 255, 255, 0.64), transparent);
-}
-
-.start-screen::after {
-  animation: start-twinkle 9s ease-in-out -4s infinite;
-  background:
-    radial-gradient(1.5px 1.5px at 6.9% 10%, rgba(255, 255, 255, 0.89), transparent),
-    radial-gradient(1.5px 1.5px at 53.6% 92.3%, rgba(255, 255, 255, 0.69), transparent),
-    radial-gradient(1.5px 1.5px at 69.3% 87.1%, rgba(255, 255, 255, 0.84), transparent),
-    radial-gradient(1.5px 1.5px at 36.1% 90.4%, rgba(255, 255, 255, 0.51), transparent),
-    radial-gradient(1.5px 1.5px at 5% 47.7%, rgba(255, 255, 255, 0.62), transparent),
-    radial-gradient(1.5px 1.5px at 93% 93.1%, rgba(255, 255, 255, 0.35), transparent),
-    radial-gradient(1.5px 1.5px at 40.8% 72.8%, rgba(255, 255, 255, 0.86), transparent),
-    radial-gradient(2px 2px at 28.8% 77%, rgba(255, 255, 255, 0.81), transparent),
-    radial-gradient(3px 3px at 86.7% 91.5%, rgba(255, 255, 255, 0.8), transparent),
-    radial-gradient(1.5px 1.5px at 9.4% 47.2%, rgba(255, 255, 255, 0.37), transparent),
-    radial-gradient(1.5px 1.5px at 23% 66.1%, rgba(255, 255, 255, 0.71), transparent),
-    radial-gradient(2px 2px at 60.6% 71.5%, rgba(255, 255, 255, 0.69), transparent),
-    radial-gradient(2px 2px at 43.7% 66.3%, rgba(255, 255, 255, 0.88), transparent),
-    radial-gradient(1.5px 1.5px at 92.1% 4.3%, rgba(255, 255, 255, 0.46), transparent),
-    radial-gradient(2px 2px at 52% 36.1%, rgba(255, 255, 255, 0.88), transparent),
-    radial-gradient(2px 2px at 9.2% 16.9%, rgba(255, 255, 255, 0.69), transparent),
-    radial-gradient(1.5px 1.5px at 63.2% 59.2%, rgba(255, 255, 255, 0.53), transparent),
-    radial-gradient(3px 3px at 24.6% 33.1%, rgba(255, 255, 255, 0.49), transparent),
-    radial-gradient(2px 2px at 24.5% 24.4%, rgba(255, 255, 255, 0.52), transparent),
-    radial-gradient(2px 2px at 89.3% 73.8%, rgba(255, 255, 255, 0.69), transparent),
-    radial-gradient(1.5px 1.5px at 90.3% 76.4%, rgba(255, 255, 255, 0.65), transparent),
-    radial-gradient(3px 3px at 40.2% 94.1%, rgba(255, 255, 255, 0.87), transparent),
-    radial-gradient(2px 2px at 46.5% 98.9%, rgba(255, 255, 255, 0.69), transparent),
-    radial-gradient(2px 2px at 87.5% 33.9%, rgba(255, 255, 255, 0.44), transparent),
-    radial-gradient(2px 2px at 54.3% 67%, rgba(255, 255, 255, 0.85), transparent),
-    radial-gradient(2px 2px at 50.7% 13.8%, rgba(255, 255, 255, 0.81), transparent),
-    radial-gradient(1.5px 1.5px at 51.8% 20%, rgba(255, 255, 255, 0.75), transparent),
-    radial-gradient(3px 3px at 16.3% 54.7%, rgba(255, 255, 255, 0.47), transparent),
-    radial-gradient(1.5px 1.5px at 78.6% 18.1%, rgba(255, 255, 255, 0.75), transparent),
-    radial-gradient(1.5px 1.5px at 91.5% 80.6%, rgba(255, 255, 255, 0.8), transparent);
+    radial-gradient(ellipse 34% 30% at 50% 47%, rgba(6, 2, 28, 0.72), rgba(6, 2, 28, 0.35) 60%, rgba(6, 2, 28, 0) 100%),
+    linear-gradient(to top, rgba(6, 2, 28, 0.9), rgba(6, 2, 28, 0) 110px),
+    radial-gradient(ellipse 75% 75% at 50% 50%, rgba(6, 2, 28, 0) 55%, rgba(6, 2, 28, 0.82) 100%);
 }
 
 .start-inner {
@@ -182,27 +112,13 @@ button:hover {
   transform-origin: center;
 }
 
-.start-headline {
-  animation: start-rise 0.7s ease 0.3s both;
-  color: var(--text);
-  font-family: Garamond, "EB Garamond", "Adobe Garamond Pro", Georgia, "Times New Roman", serif;
-  font-size: clamp(1.6rem, 3.4vw, 2.4rem);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  line-height: 1.15;
-  margin: 0;
-  max-width: 32ch;
-  text-wrap: balance;
-}
-
 .start-tagline {
-  animation: start-rise 0.7s ease 0.42s both;
-  color: var(--muted);
-  font-size: 1rem;
-  line-height: 1.55;
-  margin: 0;
-  max-width: 62ch;
-  text-wrap: pretty;
+  animation: start-rise 0.7s ease 0.35s both;
+  color: #c3c8d6;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+  margin: -6px 0 0;
+  text-shadow: 0 1px 12px rgba(6, 2, 28, 0.9);
 }
 
 .start-actions {
@@ -333,12 +249,14 @@ button:hover {
   line-height: 1;
   position: absolute;
   top: 0;
+  text-shadow: 0 1px 10px rgba(6, 2, 28, 0.95), 0 0 3px rgba(6, 2, 28, 0.9);
   transform: rotate(-7deg);
   white-space: nowrap;
 }
 
 .start-try-arrow {
   bottom: 0;
+  filter: drop-shadow(0 1px 3px rgba(6, 2, 28, 0.95));
   fill: none;
   height: 62px;
   overflow: visible;
@@ -363,67 +281,6 @@ button:hover {
 
 .start-try-head {
   animation: start-draw 0.25s ease-out 1.95s both;
-}
-
-.start-demo-note {
-  animation: start-rise 0.7s ease 0.65s both;
-  color: var(--muted);
-  font-size: 0.85rem;
-  margin: -4px 0 0;
-}
-
-.start-features {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  list-style: none;
-  margin: 26px 0 0;
-  max-width: 900px;
-  padding: 0;
-  text-align: left;
-  width: 100%;
-}
-
-.start-features li {
-  animation: start-rise 0.7s ease 0.75s both;
-  background: #0b0730;
-  border: 1px solid #221d4a;
-  border-radius: 14px;
-  display: grid;
-  gap: 4px 12px;
-  grid-template-columns: auto 1fr;
-  padding: 16px 18px;
-}
-
-.start-features li:nth-child(2) {
-  animation-delay: 0.85s;
-}
-
-.start-features li:nth-child(3) {
-  animation-delay: 0.95s;
-}
-
-.start-features svg {
-  fill: none;
-  grid-row: span 2;
-  height: 26px;
-  margin-top: 1px;
-  stroke: var(--accent);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.7;
-  width: 26px;
-}
-
-.start-features strong {
-  color: var(--text);
-  font-size: 0.95rem;
-}
-
-.start-features span {
-  color: var(--muted);
-  font-size: 0.85rem;
-  line-height: 1.45;
 }
 
 .start-footer {
@@ -499,7 +356,7 @@ button:hover {
   }
 }
 
-/* Phones: buttons stack full-width, features become a single column. */
+/* Phones: the buttons stack full-width. */
 @media (max-width: 640px) {
   .start-inner {
     gap: 16px;
@@ -518,17 +375,8 @@ button:hover {
   }
 }
 
-@media (max-width: 760px) {
-  .start-features {
-    grid-template-columns: 1fr;
-    max-width: 440px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .start-screen *,
-  .start-screen::before,
-  .start-screen::after {
+  .start-screen * {
     animation: none !important;
   }
 
@@ -559,16 +407,6 @@ button:hover {
     opacity: 0;
   }
   to {
-    opacity: 1;
-  }
-}
-
-@keyframes start-twinkle {
-  0%,
-  100% {
-    opacity: 0.5;
-  }
-  50% {
     opacity: 1;
   }
 }

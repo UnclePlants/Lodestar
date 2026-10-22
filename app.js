@@ -476,9 +476,13 @@ function setupStartScreen() {
     screen.remove();
     return;
   }
+  const stopBackdrop = startWelcomeBackdrop(screen);
   const dismiss = () => {
     screen.classList.add("hidden");
-    setTimeout(() => screen.remove(), 500);
+    setTimeout(() => {
+      stopBackdrop();
+      screen.remove();
+    }, 500);
     window.removeEventListener("keydown", onStartKey);
   };
   const onStartKey = (event) => {
@@ -500,6 +504,260 @@ function setupStartScreen() {
   demoBtn?.addEventListener("click", (event) => loadDemoMap(event.currentTarget, dismiss));
   document.getElementById("startCredits")?.addEventListener("click", () => document.getElementById("creditsDialog")?.showModal());
   window.addEventListener("keydown", onStartKey);
+}
+
+/* ---- Welcome backdrop ----
+The Telarun map, muted to the night-sky blue and drifting slowly on a diagonal; a red dotted
+route tracing a journey across it (Indiana Jones style), led by a little guiding star; and a
+field of stars that each shimmer on their own. One canvas at ~30 fps, stopped as soon as the
+welcome screen goes. With reduced motion (which Windows also reports when its animation
+effects are off) nothing moves: the map sits still with the route already drawn, and only
+the stars keep shimmering. */
+// focusX0..focusX1: the span (map px) holding the continent and the route.
+const WELCOME_MAP = { src: "telarun-map.jpg", w: 2000, h: 1500, focusX0: 150, focusX1: 1500 };
+// Hammerhelm → Khazarak → Ironbeard's Bastion → Rippleport → Seraphingate → by sea past the
+// ship → Gor'Gak → the Oasis of Zulma → Azul, in map pixels; a third value of 1 marks a town.
+const WELCOME_ROUTE = [
+  [772, 332, 1], [740, 390], [712, 448], [630, 452, 1], [598, 522], [576, 600, 1], [528, 655],
+  [474, 718, 1], [545, 765], [650, 830], [768, 902, 1], [838, 958], [893, 1010], [878, 1068],
+  [848, 1094, 1], [790, 1150], [770, 1185], [858, 1236], [962, 1282], [1058, 1304, 1],
+  [1138, 1276], [1208, 1244, 1],
+];
+const WELCOME_TIMING = { start: 1200, draw: 22000, hold: 4500, fade: 1800, rest: 1200, pan: 140000 };
+
+// A smooth (Catmull-Rom) curve through the waypoints, sampled with running lengths so the
+// line can be drawn up to any distance, plus the distance at which each town is reached.
+function buildWelcomeRoute(points) {
+  const P = points.map(([x, y, stop]) => ({ x, y, stop: !!stop }));
+  const STEPS = 16;
+  const pts = [];
+  for (let i = 0; i < P.length - 1; i++) {
+    const p0 = P[i - 1] || P[i];
+    const p1 = P[i];
+    const p2 = P[i + 1];
+    const p3 = P[i + 2] || p2;
+    for (let k = 0; k < STEPS; k++) {
+      const t = k / STEPS;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const at = (a, b, c, d) => 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (3 * b - a - 3 * c + d) * t3);
+      pts.push({ x: at(p0.x, p1.x, p2.x, p3.x), y: at(p0.y, p1.y, p2.y, p3.y) });
+    }
+  }
+  pts.push({ x: P[P.length - 1].x, y: P[P.length - 1].y });
+  let length = 0;
+  pts.forEach((p, i) => {
+    if (i) length += Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y);
+    p.len = length;
+  });
+  const stops = [];
+  P.forEach((p, i) => {
+    if (p.stop) stops.push({ x: p.x, y: p.y, len: pts[Math.min(i * STEPS, pts.length - 1)].len, end: i === P.length - 1 });
+  });
+  return { pts, stops, length };
+}
+
+function startWelcomeBackdrop(screen) {
+  const canvas = screen.querySelector(".start-backdrop");
+  const g = canvas?.getContext("2d");
+  if (!g) return () => {};
+  const still = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const T = WELCOME_TIMING;
+  const route = buildWelcomeRoute(WELCOME_ROUTE);
+  const t0 = performance.now();
+  let map = null; // the map, pre-tinted to the night-sky blue
+  let mapAt = 0;
+  let stars = [];
+  let view = { w: 0, h: 0, dpr: 1 };
+  let raf = 0;
+  let last = 0;
+  let stopped = false;
+
+  // Size the canvas to the screen (capped so huge displays stay cheap) and scatter the stars.
+  const fit = () => {
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (!w || !h || (w === view.w && h === view.h)) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5, Math.sqrt(5e6 / (w * h)));
+    view = { w, h, dpr };
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    const count = Math.round(Math.min(260, Math.max(70, (w * h) / 6500)));
+    const tints = ["255,255,255", "255,255,255", "214,226,255", "236,242,190"];
+    stars = Array.from({ length: count }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: 0.5 + Math.random() ** 3 * 1.5,
+      a: 0.35 + Math.random() * 0.6,
+      speed: 0.6 + Math.random() * 2.2, // radians per second
+      phase: Math.random() * Math.PI * 2,
+      glint: Math.random() < 0.09,
+      tint: tints[Math.floor(Math.random() * tints.length)],
+    }));
+  };
+
+  // A four-point star: the route's leading marker and the brightest stars' glints.
+  const sparkle = (x, y, outer, inner, angle) => {
+    g.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const r = i % 2 ? inner : outer;
+      const a = angle + (i * Math.PI) / 4;
+      if (i) g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+      else g.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    }
+    g.closePath();
+    g.fill();
+  };
+
+  const draw = (now) => {
+    fit();
+    const { w, h, dpr } = view;
+    const t = now - t0;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+
+    // The map, slightly larger than the screen, drifting corner to corner and back along the
+    // diagonal, starting from the middle (u = 0.5).
+    const s = 1.18 * Math.max(w / WELCOME_MAP.w, h / WELCOME_MAP.h);
+    const u = still ? 0.5 : 0.5 + 0.5 * Math.sin((2 * Math.PI * t) / T.pan);
+    const halfW = w / (2 * s);
+    const halfH = h / (2 * s);
+    // Narrow (phone) screens drift over the continent's half rather than out to sea.
+    let x0 = halfW;
+    let x1 = WELCOME_MAP.w - halfW;
+    if (WELCOME_MAP.focusX1 - WELCOME_MAP.focusX0 > 2 * halfW) {
+      x0 = Math.max(x0, WELCOME_MAP.focusX0 + halfW);
+      x1 = Math.min(x1, WELCOME_MAP.focusX1 - halfW);
+    }
+    const cx = x0 + (x1 - x0) * u;
+    const cy = halfH + (WELCOME_MAP.h - 2 * halfH) * u;
+    const ox = w / 2 - cx * s;
+    const oy = h / 2 - cy * s;
+    const X = (x) => ox + x * s;
+    const Y = (y) => oy + y * s;
+    if (map) {
+      g.globalAlpha = 0.42 * (still ? 1 : Math.min(1, (now - mapAt) / 1600));
+      g.drawImage(map, ox, oy, WELCOME_MAP.w * s, WELCOME_MAP.h * s);
+    }
+
+    // The route: drawn along at a steady pace, held, faded, then traced again.
+    const cycle = T.draw + T.hold + T.fade + T.rest;
+    const tc = still ? T.draw : (t - T.start) % cycle;
+    const shown = map && (still || t > T.start);
+    if (shown) {
+      const progress = Math.min(1, Math.max(0, tc / T.draw));
+      const fade = tc > T.draw + T.hold ? Math.max(0, 1 - (tc - T.draw - T.hold) / T.fade) : 1;
+      const reach = progress * route.length;
+      const speed = route.length / T.draw; // map px per ms
+      if (fade > 0 && reach > 0) {
+        g.globalAlpha = 0.9 * fade;
+        g.strokeStyle = "#e0523f";
+        g.lineWidth = 3.2;
+        g.lineCap = "round";
+        g.setLineDash([0, 11]);
+        g.beginPath();
+        let head = route.pts[0];
+        g.moveTo(X(head.x), Y(head.y));
+        for (let i = 1; i < route.pts.length; i++) {
+          const p = route.pts[i];
+          if (p.len <= reach) {
+            g.lineTo(X(p.x), Y(p.y));
+            head = p;
+            continue;
+          }
+          const prev = route.pts[i - 1];
+          const k = (reach - prev.len) / (p.len - prev.len || 1);
+          head = { x: prev.x + (p.x - prev.x) * k, y: prev.y + (p.y - prev.y) * k };
+          g.lineTo(X(head.x), Y(head.y));
+          break;
+        }
+        g.stroke();
+        g.setLineDash([]);
+        // Each town pops a ring as the line reaches it; an X marks the journey's end.
+        route.stops.forEach((stop) => {
+          if (stop.len > reach) return;
+          const age = still ? 1 : Math.min(1, (reach - stop.len) / speed / 600);
+          const pop = 1 + 0.5 * Math.sin(age * Math.PI) * (1 - age);
+          const x = X(stop.x);
+          const y = Y(stop.y);
+          g.lineWidth = 2;
+          if (stop.end) {
+            const r = 7 * pop;
+            g.beginPath();
+            g.moveTo(x - r, y - r);
+            g.lineTo(x + r, y + r);
+            g.moveTo(x + r, y - r);
+            g.lineTo(x - r, y + r);
+            g.stroke();
+          } else {
+            g.beginPath();
+            g.arc(x, y, 6 * age * pop, 0, Math.PI * 2);
+            g.stroke();
+          }
+        });
+        // The guiding star leading the way.
+        if (progress < 1) {
+          g.globalAlpha = fade;
+          g.fillStyle = "#e3f05a";
+          g.shadowColor = "rgba(214, 230, 74, 0.9)";
+          g.shadowBlur = 12;
+          sparkle(X(head.x), Y(head.y), 8, 2, t / 900);
+          g.shadowBlur = 0;
+        }
+      }
+    }
+
+    // Stars, each shimmering on its own rhythm; the brightest flash a glint at their peak.
+    for (const st of stars) {
+      const tw = 0.5 + 0.5 * Math.sin((t / 1000) * st.speed + st.phase);
+      const alpha = st.a * (0.3 + 0.7 * tw);
+      g.globalAlpha = alpha;
+      g.fillStyle = `rgb(${st.tint})`;
+      g.beginPath();
+      g.arc(st.x, st.y, st.r, 0, Math.PI * 2);
+      g.fill();
+      if (st.glint && tw > 0.86) {
+        const k = (tw - 0.86) / 0.14;
+        g.globalAlpha = alpha * k;
+        sparkle(st.x, st.y, st.r * (3 + 5 * k), st.r * 0.35, Math.PI / 4);
+      }
+    }
+    g.globalAlpha = 1;
+  };
+
+  const loop = (now) => {
+    if (stopped) return;
+    raf = requestAnimationFrame(loop);
+    if (now - last < 32) return; // ~30 fps is plenty for a slow drift
+    last = now;
+    draw(now);
+  };
+
+  const img = new Image();
+  img.onload = () => {
+    if (stopped) return;
+    // Tint once: keep the map's light and shade but take the night-sky blue's colour.
+    const off = document.createElement("canvas");
+    off.width = img.naturalWidth;
+    off.height = img.naturalHeight;
+    const o = off.getContext("2d");
+    o.fillStyle = "#1c3268";
+    o.fillRect(0, 0, off.width, off.height);
+    o.globalCompositeOperation = "luminosity";
+    o.drawImage(img, 0, 0);
+    map = off;
+    mapAt = performance.now();
+  };
+  img.src = WELCOME_MAP.src;
+
+  raf = requestAnimationFrame(loop);
+  return () => {
+    stopped = true;
+    cancelAnimationFrame(raf);
+    map = null;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, canvas.width, canvas.height);
+  };
 }
 
 // Demo: load the bundled sample library (a Fantasy Atlas map) and reveal the app. The data

@@ -20,6 +20,10 @@
   </head>
   <body>
     <div class="start-screen" id="startScreen">
+      <!-- Backdrop (drawn by app.js): the Telarun map drifting under the stars, a dotted route
+           tracing across it, and a vignette keeping the centre calm for the logo and buttons. -->
+      <canvas class="start-backdrop" aria-hidden="true"></canvas>
+      <div class="start-vignette" aria-hidden="true"></div>
       <div class="start-inner">
         <svg class="start-logo" viewBox="0 0 1164 348" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lodestar">
           <g transform="translate(-643 -806)">
@@ -32,8 +36,7 @@
             <path d="M93.6243 1.58081C125.089 8.01389 149.394 33.0749 154.862 64.7217" stroke="#FFFFFF" stroke-width="6.875" stroke-miterlimit="8" fill="none" fill-rule="evenodd" transform="matrix(1 0 0 -1 875.5 1033.5)"/>
           </g>
         </svg>
-        <h1 class="start-headline">Show your players the map,<br> not the secrets.</h1>
-        <p class="start-tagline">A free battlemap display for game masters. Paint fog of war, cast the map to your table's screen, and keep everything else on yours — right in your browser, with no account and nothing to install.</p>
+        <p class="start-tagline">A battlemap display tool for game masters.</p>
         <div class="start-actions">
           <div class="start-demo-wrap">
             <!-- "Try it now" callout: a hand-drawn arrow that draws itself onto the demo button. -->
@@ -54,24 +57,6 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
           </button>
         </div>
-        <p class="start-demo-note">The demo opens a three-floor tavern with fog, tokens, initiative and music ready to go.</p>
-        <ul class="start-features">
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.24"/><path d="M16 17H7"/><path d="M17 21H9"/></svg>
-            <strong>Fog of war</strong>
-            <span>Trace, paint or stamp fog, then reveal each room as the party explores.</span>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-            <strong>A screen for the table</strong>
-            <span>Cast to a TV or second monitor. Players see only what you choose to show.</span>
-          </li>
-          <li>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 20.5 7.25v9.5L12 21.5 3.5 16.75v-9.5Z"/><path d="M12 7.5 16.5 15h-9Z"/><path d="M12 2.5v5M20.5 7.25 16.5 15M3.5 7.25 7.5 15"/></svg>
-            <strong>The whole encounter</strong>
-            <span>Tokens, initiative, music and 3D dice — all in one place, even offline.</span>
-          </li>
-        </ul>
       </div>
       <footer class="start-footer">
         <span>made by u/UnclePlants</span>
