@@ -512,7 +512,8 @@ along its roads by a red dashed line (Indiana Jones style), one after another, f
 advances slowly behind a little guiding star and fades away behind itself as it goes; and a
 field of stars that each shimmer on their own. One canvas at ~30 fps, stopped as soon as the
 welcome screen goes. With reduced motion (which Windows also reports when its animation effects
-are off) nothing moves: the map sits still with one journey drawn, and only the stars shimmer. */
+are off) the map stops drifting and holds still; the journeys and the stars carry on, as they are
+small, slow movements rather than the whole screen sliding. */
 // focusX0..focusX1: the span (map px) holding the continent and its roads.
 const WELCOME_MAP = { src: "telarun-map.jpg", w: 2000, h: 1500, focusX0: 150, focusX1: 1500 };
 // The map's roads, traced from the painted roads, as flat [x, y, x, y, …] lists in map px.
@@ -580,14 +581,15 @@ function startWelcomeBackdrop(screen) {
   const canvas = screen.querySelector(".start-backdrop");
   const g = canvas?.getContext("2d");
   if (!g) return () => {};
-  const still = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  // Reduced motion only pins the map in place (see above).
+  const pinMap = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const T = WELCOME_TIMING;
   const journeys = WELCOME_JOURNEYS.map(buildWelcomeJourney);
   const lastUsed = journeys.map(() => 0);
   let turn = 0;
   let nextTripAt = T.start;
-  // Journeys under way or fading out; with reduced motion, one journey drawn and left still.
-  let trips = still ? [{ j: journeys[0], start: 0 }] : [];
+  // Journeys under way or fading out.
+  let trips = [];
   const t0 = performance.now();
   let map = null; // the map, pre-tinted to the night-sky blue
   let mapAt = 0;
@@ -654,10 +656,9 @@ function startWelcomeBackdrop(screen) {
   // the start, the guiding star at the head, and an X when it arrives.
   const drawTrip = (trip, t, X, Y, s) => {
     const { j } = trip;
-    const elapsed = still ? Infinity : t - trip.start;
+    const elapsed = t - trip.start;
     const head = Math.min(j.length, (elapsed / 1000) * T.speed);
     const alphaAt = (d) => {
-      if (still) return 1;
       const age = elapsed - (d / T.speed) * 1000;
       return age < T.life ? 1 : Math.max(0, 1 - (age - T.life) / T.fade);
     };
@@ -690,7 +691,7 @@ function startWelcomeBackdrop(screen) {
     }
     if (head >= j.length) {
       const end = j.pts[j.pts.length - 1];
-      const since = still ? Infinity : elapsed - (j.length / T.speed) * 1000;
+      const since = elapsed - (j.length / T.speed) * 1000;
       const r = 6 * Math.min(1, since / 350);
       g.globalAlpha = 0.95 * alphaAt(j.length);
       g.beginPath();
@@ -720,7 +721,7 @@ function startWelcomeBackdrop(screen) {
     // The map, slightly larger than the screen, drifting corner to corner and back along the
     // diagonal, starting from the middle (u = 0.5).
     const s = 1.18 * Math.max(w / WELCOME_MAP.w, h / WELCOME_MAP.h);
-    const u = still ? 0.5 : 0.5 + 0.5 * Math.sin((2 * Math.PI * t) / T.pan);
+    const u = pinMap ? 0.5 : 0.5 + 0.5 * Math.sin((2 * Math.PI * t) / T.pan);
     const halfW = w / (2 * s);
     const halfH = h / (2 * s);
     // Narrow (phone) screens drift over the continent's half rather than out to sea.
@@ -737,21 +738,21 @@ function startWelcomeBackdrop(screen) {
     const X = (x) => ox + x * s;
     const Y = (y) => oy + y * s;
     if (map) {
-      g.globalAlpha = 0.42 * (still ? 1 : Math.min(1, (now - mapAt) / 1600));
+      g.globalAlpha = 0.42 * Math.min(1, (now - mapAt) / 1600);
       g.drawImage(map, ox, oy, WELCOME_MAP.w * s, WELCOME_MAP.h * s);
     }
 
     // Journeys along the roads, one after another: the dashed line advances slowly behind the
     // guiding star and fades away behind itself, so each journey eventually disappears.
     if (map) {
-      if (!still && t >= nextTripAt) {
+      if (t >= nextTripAt) {
         const index = pickJourney(X, Y, w, h);
         const j = journeys[index];
         lastUsed[index] = ++turn;
         trips.push({ j, start: t });
         nextTripAt = t + (j.length / T.speed) * 1000 + T.gap;
       }
-      if (!still) trips = trips.filter((trip) => t < trip.start + (trip.j.length / T.speed) * 1000 + T.life + T.fade);
+      trips = trips.filter((trip) => t < trip.start + (trip.j.length / T.speed) * 1000 + T.life + T.fade);
       trips.forEach((trip) => drawTrip(trip, t, X, Y, s));
     }
 
