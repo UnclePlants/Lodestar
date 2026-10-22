@@ -527,17 +527,33 @@ const WELCOME_ROADS = {
   west: [120,775, 119.5,778.5, 121.5,788, 136,800, 159.5,806.5, 181,808.5, 200.5,815.5, 221.5,816, 230.5,815, 250,808, 259.5,805.5, 275,803, 303.5,800.5, 330.5,813, 348,825.5, 354.5,832.5, 369,853.5, 377,859.5, 389.5,864, 412.5,860.5, 434.5,851.5, 451,841, 460,837, 493,834.5, 517,831.5, 550,828.5, 595,828, 604,826.5, 607,825],
   south: [824,1108, 814.5,1108.5, 805.5,1111, 797.5,1116, 790,1119.5, 782.5,1124.5, 776.5,1127.5, 767,1135.5, 760,1149.5, 760,1159, 762,1174, 761,1179, 776,1187, 799.5,1187, 820,1190, 828.5,1192, 850.5,1199.5, 870,1209, 893.5,1224.5, 921,1261.5, 929,1275, 937.5,1283.5, 944.5,1289.5, 970.5,1306.5, 979,1310, 995.5,1316, 1007.5,1318, 1037.5,1318, 1066.5,1314.5, 1084.5,1318, 1097,1315.5, 1118,1305.5, 1165.5,1279, 1196.5,1257, 1203,1251.5, 1204,1248],
 };
-// Journeys chain roads end to end ("-name" runs a road backwards).
-const WELCOME_JOURNEYS = [
-  ["hammerhelm", "north", "rippleport"], // Hammerhelm → Rippleport
-  ["-rippleport", "east", "seraphingate"], // Rippleport → Seraphingate
-  ["south"], // Gor'Gak → the Oasis of Zulma → Azul
-  ["khazarak", "north", "east", "seraphingate"], // Khazarak → Seraphingate
-  ["west", "seraphingate"], // Athel'Doin → past Verda Glade → Seraphingate
-];
 // speed: map px per second · life: how long a dash stays before it starts to fade · fade ·
 // gap: pause between one journey's arrival and the next one's start · pan: one drift there and back.
 const WELCOME_TIMING = { start: 1000, speed: 38, life: 7000, fade: 3500, gap: 1800, pan: 140000 };
+
+// Every town-to-town route along the roads, each way round: a list of roads chained end to end
+// ("-name" runs a road backwards). Roads meet where their end points match; a road end no other
+// road meets is a town (Hammerhelm, Khazarak, Rippleport, Seraphingate, Athel'Doin, Gor'Gak, Azul).
+function welcomeRoutes() {
+  const links = {};
+  const link = (at, name, to) => (links[at] = links[at] || []).push({ name, to });
+  Object.entries(WELCOME_ROADS).forEach(([name, flat]) => {
+    const a = `${flat[0]},${flat[1]}`;
+    const b = `${flat[flat.length - 2]},${flat[flat.length - 1]}`;
+    link(a, name, b);
+    link(b, `-${name}`, a);
+  });
+  const routes = [];
+  // The roads form a tree, so walking on without turning back reaches each other town once.
+  const walk = (from, at, cameFrom, names) => {
+    if (names.length && links[at].length === 1) routes.push({ names, from, to: at });
+    links[at].forEach((l) => l.to !== cameFrom && walk(from, l.to, at, [...names, l.name]));
+  };
+  Object.keys(links)
+    .filter((at) => links[at].length === 1)
+    .forEach((town) => walk(town, town, null, []));
+  return routes;
+}
 
 // A journey as one polyline with running lengths, so it can be drawn up to any distance.
 function buildWelcomeJourney(names) {
@@ -584,9 +600,8 @@ function startWelcomeBackdrop(screen) {
   // Reduced motion only pins the map in place (see above).
   const pinMap = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const T = WELCOME_TIMING;
-  const journeys = WELCOME_JOURNEYS.map(buildWelcomeJourney);
-  const lastUsed = journeys.map(() => 0);
-  let turn = 0;
+  const journeys = welcomeRoutes().map((r) => ({ ...buildWelcomeJourney(r.names), from: r.from, to: r.to }));
+  let recent = []; // the last two journeys, newest first
   let nextTripAt = T.start;
   // Journeys under way or fading out.
   let trips = [];
@@ -635,21 +650,20 @@ function startWelcomeBackdrop(screen) {
     g.fill();
   };
 
-  // Next journey: the one most on screen right now, favouring roads not travelled lately.
+  // Next journey: a random one of those (nearly) as much on screen as any right now, setting out
+  // from a town neither of the last two did, and not just retracing the last one's steps.
   const pickJourney = (X, Y, w, h) => {
-    let best = 0;
-    let bestScore = -Infinity;
-    journeys.forEach((j, index) => {
+    const onScreen = (j) => {
       const sample = j.pts.filter((p, i) => i % 2 === 0);
-      const seen = sample.filter((p) => X(p.x) > 30 && X(p.x) < w - 30 && Y(p.y) > 30 && Y(p.y) < h - 30).length;
-      const rest = Math.min(4, turn - lastUsed[index]); // turns since this road was last travelled
-      const score = seen / sample.length + 0.18 * rest - (lastUsed[index] === turn ? 10 : 0);
-      if (score > bestScore) {
-        bestScore = score;
-        best = index;
-      }
-    });
-    return best;
+      return sample.filter((p) => X(p.x) > 30 && X(p.x) < w - 30 && Y(p.y) > 30 && Y(p.y) < h - 30).length / sample.length;
+    };
+    const fresh = journeys.filter(
+      (j) => !recent.some((r) => r.from === j.from) && !(recent[0]?.from === j.to && recent[0]?.to === j.from)
+    );
+    const options = (fresh.length ? fresh : journeys).map((j) => ({ j, seen: onScreen(j) }));
+    const best = Math.max(...options.map((o) => o.seen));
+    const pool = options.filter((o) => o.seen >= Math.min(0.75, best - 0.1));
+    return pool[Math.floor(Math.random() * pool.length)].j;
   };
 
   // One journey: dashes up to the head, each fading once it's been there for `life`, a ring at
@@ -746,9 +760,8 @@ function startWelcomeBackdrop(screen) {
     // guiding star and fades away behind itself, so each journey eventually disappears.
     if (map) {
       if (t >= nextTripAt) {
-        const index = pickJourney(X, Y, w, h);
-        const j = journeys[index];
-        lastUsed[index] = ++turn;
+        const j = pickJourney(X, Y, w, h);
+        recent = [j, recent[0]].filter(Boolean);
         trips.push({ j, start: t });
         nextTripAt = t + (j.length / T.speed) * 1000 + T.gap;
       }
@@ -5124,13 +5137,23 @@ function setupDice() {
   controls.diceSound.checked = dice.prefs.sound !== false;
   controls.diceToggle?.addEventListener("click", () => toggleDicePanel());
   controls.diceClose?.addEventListener("click", () => toggleDicePanel(false));
+  // Click adds a die; right-click (or shift-click) takes one back off.
   controls.dicePad?.addEventListener("click", (event) => {
     const sides = Number(event.target.closest("[data-die]")?.dataset.die);
-    if (sides) addDieToExpr(sides);
+    if (!sides) return;
+    if (event.shiftKey) removeDieFromExpr(sides);
+    else addDieToExpr(sides);
+  });
+  controls.dicePad?.addEventListener("contextmenu", (event) => {
+    const sides = Number(event.target.closest("[data-die]")?.dataset.die);
+    if (!sides) return;
+    event.preventDefault();
+    removeDieFromExpr(sides);
   });
   controls.diceClear?.addEventListener("click", () => {
     controls.diceExpr.value = "";
     showDiceError("");
+    updateDicePad();
     controls.diceExpr.focus();
   });
   controls.diceExpr?.addEventListener("keydown", (event) => {
@@ -5141,7 +5164,10 @@ function setupDice() {
       toggleDicePanel(false);
     }
   });
-  controls.diceExpr?.addEventListener("input", () => showDiceError(""));
+  controls.diceExpr?.addEventListener("input", () => {
+    showDiceError("");
+    updateDicePad();
+  });
   controls.diceRoll?.addEventListener("click", () => rollDice());
   controls.diceAdv?.addEventListener("click", () => rollDice(withAdvantage("h")));
   controls.diceDis?.addEventListener("click", () => rollDice(withAdvantage("l")));
@@ -5152,6 +5178,7 @@ function setupDice() {
     const row = event.target.closest("[data-expr]");
     if (row) rollDice(row.dataset.expr);
   });
+  updateDicePad();
 }
 
 function saveDicePrefs(patch) {
@@ -5190,6 +5217,56 @@ function addDieToExpr(sides) {
   else terms.push({ type: "dice", sign: 1, count: 1, sides, keep: null });
   controls.diceExpr.value = LodestarDice.format(terms);
   showDiceError("");
+  updateDicePad();
+}
+
+// The reverse of the pad: one die of that size comes off the roll ("3d6" -> "2d6", "1d6" goes).
+// A keep/drop rule shrinks with it, and is dropped once it no longer picks anything out.
+function removeDieFromExpr(sides) {
+  let terms;
+  try {
+    terms = LodestarDice.parse(controls.diceExpr.value.trim());
+  } catch {
+    return;
+  }
+  const matches = terms.filter((t) => t.type === "dice" && t.sides === sides && t.sign > 0);
+  const term = matches.find((t) => !t.keep) || matches[matches.length - 1];
+  if (!term) return;
+  term.count -= 1;
+  if (term.keep) {
+    const dropped = term.keep.text ? Number(term.keep.text.slice(2)) : 0;
+    term.keep.n = dropped ? term.count - dropped : Math.min(term.keep.n, term.count);
+    if (term.keep.n < 1 || term.keep.n >= term.count) term.keep = null;
+  }
+  if (!term.count) terms.splice(terms.indexOf(term), 1);
+  // Only a modifier left ("+5") isn't a roll any more, so start over.
+  controls.diceExpr.value = terms.some((t) => t.type === "dice") ? LodestarDice.format(terms) : "";
+  showDiceError("");
+  updateDicePad();
+}
+
+// Badges on the pad show how many of each die the roll holds; Clear is live only with a roll.
+function updateDicePad() {
+  if (!controls.dicePad) return;
+  const value = controls.diceExpr.value.trim();
+  const counts = {};
+  try {
+    for (const t of value ? LodestarDice.parse(value) : []) {
+      if (t.type === "dice" && t.sign > 0) counts[t.sides] = (counts[t.sides] || 0) + t.count;
+    }
+  } catch {}
+  controls.dicePad.querySelectorAll("[data-die]").forEach((button) => {
+    const n = counts[button.dataset.die] || 0;
+    let badge = button.querySelector(".dice-count");
+    if (n && !badge) badge = button.appendChild(Object.assign(document.createElement("span"), { className: "dice-count" }));
+    if (badge) {
+      if (n) badge.textContent = n;
+      else badge.remove();
+    }
+    button.classList.toggle("has-dice", !!n);
+    button.title = n ? `${n}d${button.dataset.die} in the roll · right-click to remove one` : `Add a d${button.dataset.die}`;
+  });
+  if (controls.diceClear) controls.diceClear.disabled = !value;
 }
 
 // Advantage / disadvantage: the roll's d20 becomes 2d20 keep-highest / keep-lowest (a d20 is
@@ -5219,6 +5296,7 @@ function rollDice(exprOverride) {
   }
   showDiceError("");
   controls.diceExpr.value = roll.expr; // normalised, e.g. "d20 + 5" -> "1d20+5"
+  updateDicePad();
   roll.public = !!dice.prefs.public;
   dice.history.unshift({ expr: roll.expr, total: roll.total, detail: diceDetailHtml(roll), public: roll.public });
   dice.history.length = Math.min(dice.history.length, 12);
