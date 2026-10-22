@@ -507,54 +507,73 @@ function setupStartScreen() {
 }
 
 /* ---- Welcome backdrop ----
-The Telarun map, muted to the night-sky blue and drifting slowly on a diagonal; a red dotted
-route tracing a journey across it (Indiana Jones style), led by a little guiding star; and a
+The Telarun map, muted to the night-sky blue and drifting slowly on a diagonal; journeys traced
+along its roads by a red dashed line (Indiana Jones style), one after another, forever: the line
+advances slowly behind a little guiding star and fades away behind itself as it goes; and a
 field of stars that each shimmer on their own. One canvas at ~30 fps, stopped as soon as the
-welcome screen goes. With reduced motion (which Windows also reports when its animation
-effects are off) nothing moves: the map sits still with the route already drawn, and only
-the stars keep shimmering. */
-// focusX0..focusX1: the span (map px) holding the continent and the route.
+welcome screen goes. With reduced motion (which Windows also reports when its animation effects
+are off) nothing moves: the map sits still with one journey drawn, and only the stars shimmer. */
+// focusX0..focusX1: the span (map px) holding the continent and its roads.
 const WELCOME_MAP = { src: "telarun-map.jpg", w: 2000, h: 1500, focusX0: 150, focusX1: 1500 };
-// Hammerhelm → Khazarak → Ironbeard's Bastion → Rippleport → Seraphingate → by sea past the
-// ship → Gor'Gak → the Oasis of Zulma → Azul, in map pixels; a third value of 1 marks a town.
-const WELCOME_ROUTE = [
-  [772, 332, 1], [740, 390], [712, 448], [630, 452, 1], [598, 522], [576, 600, 1], [528, 655],
-  [474, 718, 1], [545, 765], [650, 830], [768, 902, 1], [838, 958], [893, 1010], [878, 1068],
-  [848, 1094, 1], [790, 1150], [770, 1185], [858, 1236], [962, 1282], [1058, 1304, 1],
-  [1138, 1276], [1208, 1244, 1],
+// The map's roads, traced from the painted roads, as flat [x, y, x, y, …] lists in map px.
+const WELCOME_ROADS = {
+  hammerhelm: [751,330, 747.5,338, 723,368, 718.5,379.5, 717.5,386.5, 723,401.5, 724,410, 722,422, 721,440, 719,456, 717.5,465.5, 712,480],
+  khazarak: [637,457, 639,460, 646.5,466, 652.5,468.5, 676,474.5, 692.5,480.5, 712,480],
+  north: [712,480, 713,489.5, 717.5,507.5, 719,517, 717,535.5, 715.5,545, 709,567, 704,578.5, 700.5,591.5, 697.5,597.5, 693,602.5, 640.5,647, 564,694.5, 540.5,710, 533,717],
+  rippleport: [533,717, 530.5,719, 516.5,724, 493,725],
+  east: [533,717, 533,729, 538.5,741, 559,765.5, 595.5,814.5, 607,825],
+  seraphingate: [607,825, 614.5,834, 635.5,856, 653.5,871.5, 663,878.5, 692.5,894.5, 717,903, 733,910.5, 741.5,912, 753,913],
+  west: [120,775, 119.5,778.5, 121.5,788, 136,800, 159.5,806.5, 181,808.5, 200.5,815.5, 221.5,816, 230.5,815, 250,808, 259.5,805.5, 275,803, 303.5,800.5, 330.5,813, 348,825.5, 354.5,832.5, 369,853.5, 377,859.5, 389.5,864, 412.5,860.5, 434.5,851.5, 451,841, 460,837, 493,834.5, 517,831.5, 550,828.5, 595,828, 604,826.5, 607,825],
+  south: [824,1108, 814.5,1108.5, 805.5,1111, 797.5,1116, 790,1119.5, 782.5,1124.5, 776.5,1127.5, 767,1135.5, 760,1149.5, 760,1159, 762,1174, 761,1179, 776,1187, 799.5,1187, 820,1190, 828.5,1192, 850.5,1199.5, 870,1209, 893.5,1224.5, 921,1261.5, 929,1275, 937.5,1283.5, 944.5,1289.5, 970.5,1306.5, 979,1310, 995.5,1316, 1007.5,1318, 1037.5,1318, 1066.5,1314.5, 1084.5,1318, 1097,1315.5, 1118,1305.5, 1165.5,1279, 1196.5,1257, 1203,1251.5, 1204,1248],
+};
+// Journeys chain roads end to end ("-name" runs a road backwards).
+const WELCOME_JOURNEYS = [
+  ["hammerhelm", "north", "rippleport"], // Hammerhelm → Rippleport
+  ["-rippleport", "east", "seraphingate"], // Rippleport → Seraphingate
+  ["south"], // Gor'Gak → the Oasis of Zulma → Azul
+  ["khazarak", "north", "east", "seraphingate"], // Khazarak → Seraphingate
+  ["west", "seraphingate"], // Athel'Doin → past Verda Glade → Seraphingate
 ];
-const WELCOME_TIMING = { start: 1200, draw: 22000, hold: 4500, fade: 1800, rest: 1200, pan: 140000 };
+// speed: map px per second · life: how long a dash stays before it starts to fade · fade ·
+// gap: pause between one journey's arrival and the next one's start · pan: one drift there and back.
+const WELCOME_TIMING = { start: 1000, speed: 38, life: 7000, fade: 3500, gap: 1800, pan: 140000 };
 
-// A smooth (Catmull-Rom) curve through the waypoints, sampled with running lengths so the
-// line can be drawn up to any distance, plus the distance at which each town is reached.
-function buildWelcomeRoute(points) {
-  const P = points.map(([x, y, stop]) => ({ x, y, stop: !!stop }));
-  const STEPS = 16;
+// A journey as one polyline with running lengths, so it can be drawn up to any distance.
+function buildWelcomeJourney(names) {
   const pts = [];
-  for (let i = 0; i < P.length - 1; i++) {
-    const p0 = P[i - 1] || P[i];
-    const p1 = P[i];
-    const p2 = P[i + 1];
-    const p3 = P[i + 2] || p2;
-    for (let k = 0; k < STEPS; k++) {
-      const t = k / STEPS;
-      const t2 = t * t;
-      const t3 = t2 * t;
-      const at = (a, b, c, d) => 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (3 * b - a - 3 * c + d) * t3);
-      pts.push({ x: at(p0.x, p1.x, p2.x, p3.x), y: at(p0.y, p1.y, p2.y, p3.y) });
-    }
-  }
-  pts.push({ x: P[P.length - 1].x, y: P[P.length - 1].y });
+  names.forEach((name) => {
+    const flat = WELCOME_ROADS[name.replace(/^-/, "")];
+    const road = [];
+    for (let i = 0; i < flat.length; i += 2) road.push({ x: flat[i], y: flat[i + 1] });
+    if (name.startsWith("-")) road.reverse();
+    road.forEach((p, i) => {
+      if (i || !pts.length) pts.push(p); // roads share their joining point
+    });
+  });
   let length = 0;
   pts.forEach((p, i) => {
     if (i) length += Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y);
     p.len = length;
   });
-  const stops = [];
-  P.forEach((p, i) => {
-    if (p.stop) stops.push({ x: p.x, y: p.y, len: pts[Math.min(i * STEPS, pts.length - 1)].len, end: i === P.length - 1 });
-  });
-  return { pts, stops, length };
+  return { pts, length };
+}
+
+// The point `d` map px along a journey, with `i` the index of the next vertex after it.
+function journeyPointAt(j, d) {
+  const pts = j.pts;
+  if (d <= 0) return { x: pts[0].x, y: pts[0].y, i: 1 };
+  if (d >= j.length) return { x: pts[pts.length - 1].x, y: pts[pts.length - 1].y, i: pts.length };
+  let lo = 0;
+  let hi = pts.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (pts[mid].len < d) lo = mid;
+    else hi = mid;
+  }
+  const a = pts[lo];
+  const b = pts[hi];
+  const k = (d - a.len) / (b.len - a.len || 1);
+  return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, i: hi };
 }
 
 function startWelcomeBackdrop(screen) {
@@ -563,7 +582,12 @@ function startWelcomeBackdrop(screen) {
   if (!g) return () => {};
   const still = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const T = WELCOME_TIMING;
-  const route = buildWelcomeRoute(WELCOME_ROUTE);
+  const journeys = WELCOME_JOURNEYS.map(buildWelcomeJourney);
+  const lastUsed = journeys.map(() => 0);
+  let turn = 0;
+  let nextTripAt = T.start;
+  // Journeys under way or fading out; with reduced motion, one journey drawn and left still.
+  let trips = still ? [{ j: journeys[0], start: 0 }] : [];
   const t0 = performance.now();
   let map = null; // the map, pre-tinted to the night-sky blue
   let mapAt = 0;
@@ -609,6 +633,83 @@ function startWelcomeBackdrop(screen) {
     g.fill();
   };
 
+  // Next journey: the one most on screen right now, favouring roads not travelled lately.
+  const pickJourney = (X, Y, w, h) => {
+    let best = 0;
+    let bestScore = -Infinity;
+    journeys.forEach((j, index) => {
+      const sample = j.pts.filter((p, i) => i % 2 === 0);
+      const seen = sample.filter((p) => X(p.x) > 30 && X(p.x) < w - 30 && Y(p.y) > 30 && Y(p.y) < h - 30).length;
+      const rest = Math.min(4, turn - lastUsed[index]); // turns since this road was last travelled
+      const score = seen / sample.length + 0.18 * rest - (lastUsed[index] === turn ? 10 : 0);
+      if (score > bestScore) {
+        bestScore = score;
+        best = index;
+      }
+    });
+    return best;
+  };
+
+  // One journey: dashes up to the head, each fading once it's been there for `life`, a ring at
+  // the start, the guiding star at the head, and an X when it arrives.
+  const drawTrip = (trip, t, X, Y, s) => {
+    const { j } = trip;
+    const elapsed = still ? Infinity : t - trip.start;
+    const head = Math.min(j.length, (elapsed / 1000) * T.speed);
+    const alphaAt = (d) => {
+      if (still) return 1;
+      const age = elapsed - (d / T.speed) * 1000;
+      return age < T.life ? 1 : Math.max(0, 1 - (age - T.life) / T.fade);
+    };
+    const period = 14 / s; // 8 px dash + 6 px gap on screen, in map px
+    const dash = 8 / s;
+    g.strokeStyle = "#e0523f";
+    g.lineWidth = 2.6;
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    for (let d0 = 0; d0 < head; d0 += period) {
+      const a = alphaAt(d0);
+      if (a <= 0) continue;
+      const d1 = Math.min(head, d0 + dash);
+      const p0 = journeyPointAt(j, d0);
+      g.globalAlpha = 0.9 * a;
+      g.beginPath();
+      g.moveTo(X(p0.x), Y(p0.y));
+      for (let i = p0.i; i < j.pts.length && j.pts[i].len < d1; i++) g.lineTo(X(j.pts[i].x), Y(j.pts[i].y));
+      const p1 = journeyPointAt(j, d1);
+      g.lineTo(X(p1.x), Y(p1.y));
+      g.stroke();
+    }
+    g.lineWidth = 2;
+    const startAlpha = alphaAt(0);
+    if (startAlpha > 0) {
+      g.globalAlpha = 0.9 * startAlpha;
+      g.beginPath();
+      g.arc(X(j.pts[0].x), Y(j.pts[0].y), 5, 0, Math.PI * 2);
+      g.stroke();
+    }
+    if (head >= j.length) {
+      const end = j.pts[j.pts.length - 1];
+      const since = still ? Infinity : elapsed - (j.length / T.speed) * 1000;
+      const r = 6 * Math.min(1, since / 350);
+      g.globalAlpha = 0.95 * alphaAt(j.length);
+      g.beginPath();
+      g.moveTo(X(end.x) - r, Y(end.y) - r);
+      g.lineTo(X(end.x) + r, Y(end.y) + r);
+      g.moveTo(X(end.x) + r, Y(end.y) - r);
+      g.lineTo(X(end.x) - r, Y(end.y) + r);
+      g.stroke();
+    } else {
+      const p = journeyPointAt(j, head);
+      g.globalAlpha = 1;
+      g.fillStyle = "#e3f05a";
+      g.shadowColor = "rgba(214, 230, 74, 0.9)";
+      g.shadowBlur = 10;
+      sparkle(X(p.x), Y(p.y), 7, 1.8, t / 900);
+      g.shadowBlur = 0;
+    }
+  };
+
   const draw = (now) => {
     fit();
     const { w, h, dpr } = view;
@@ -640,71 +741,18 @@ function startWelcomeBackdrop(screen) {
       g.drawImage(map, ox, oy, WELCOME_MAP.w * s, WELCOME_MAP.h * s);
     }
 
-    // The route: drawn along at a steady pace, held, faded, then traced again.
-    const cycle = T.draw + T.hold + T.fade + T.rest;
-    const tc = still ? T.draw : (t - T.start) % cycle;
-    const shown = map && (still || t > T.start);
-    if (shown) {
-      const progress = Math.min(1, Math.max(0, tc / T.draw));
-      const fade = tc > T.draw + T.hold ? Math.max(0, 1 - (tc - T.draw - T.hold) / T.fade) : 1;
-      const reach = progress * route.length;
-      const speed = route.length / T.draw; // map px per ms
-      if (fade > 0 && reach > 0) {
-        g.globalAlpha = 0.9 * fade;
-        g.strokeStyle = "#e0523f";
-        g.lineWidth = 3.2;
-        g.lineCap = "round";
-        g.setLineDash([0, 11]);
-        g.beginPath();
-        let head = route.pts[0];
-        g.moveTo(X(head.x), Y(head.y));
-        for (let i = 1; i < route.pts.length; i++) {
-          const p = route.pts[i];
-          if (p.len <= reach) {
-            g.lineTo(X(p.x), Y(p.y));
-            head = p;
-            continue;
-          }
-          const prev = route.pts[i - 1];
-          const k = (reach - prev.len) / (p.len - prev.len || 1);
-          head = { x: prev.x + (p.x - prev.x) * k, y: prev.y + (p.y - prev.y) * k };
-          g.lineTo(X(head.x), Y(head.y));
-          break;
-        }
-        g.stroke();
-        g.setLineDash([]);
-        // Each town pops a ring as the line reaches it; an X marks the journey's end.
-        route.stops.forEach((stop) => {
-          if (stop.len > reach) return;
-          const age = still ? 1 : Math.min(1, (reach - stop.len) / speed / 600);
-          const pop = 1 + 0.5 * Math.sin(age * Math.PI) * (1 - age);
-          const x = X(stop.x);
-          const y = Y(stop.y);
-          g.lineWidth = 2;
-          if (stop.end) {
-            const r = 7 * pop;
-            g.beginPath();
-            g.moveTo(x - r, y - r);
-            g.lineTo(x + r, y + r);
-            g.moveTo(x + r, y - r);
-            g.lineTo(x - r, y + r);
-            g.stroke();
-          } else {
-            g.beginPath();
-            g.arc(x, y, 6 * age * pop, 0, Math.PI * 2);
-            g.stroke();
-          }
-        });
-        // The guiding star leading the way.
-        if (progress < 1) {
-          g.globalAlpha = fade;
-          g.fillStyle = "#e3f05a";
-          g.shadowColor = "rgba(214, 230, 74, 0.9)";
-          g.shadowBlur = 12;
-          sparkle(X(head.x), Y(head.y), 8, 2, t / 900);
-          g.shadowBlur = 0;
-        }
+    // Journeys along the roads, one after another: the dashed line advances slowly behind the
+    // guiding star and fades away behind itself, so each journey eventually disappears.
+    if (map) {
+      if (!still && t >= nextTripAt) {
+        const index = pickJourney(X, Y, w, h);
+        const j = journeys[index];
+        lastUsed[index] = ++turn;
+        trips.push({ j, start: t });
+        nextTripAt = t + (j.length / T.speed) * 1000 + T.gap;
       }
+      if (!still) trips = trips.filter((trip) => t < trip.start + (trip.j.length / T.speed) * 1000 + T.life + T.fade);
+      trips.forEach((trip) => drawTrip(trip, t, X, Y, s));
     }
 
     // Stars, each shimmering on its own rhythm; the brightest flash a glint at their peak.
