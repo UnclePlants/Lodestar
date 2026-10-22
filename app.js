@@ -507,15 +507,17 @@ function setupStartScreen() {
 }
 
 /* ---- Welcome backdrop ----
-The Telarun map, muted to the night-sky blue and drifting slowly on a diagonal; journeys traced
-along its roads by a white dashed line (Indiana Jones style), one after another, forever: the line
-advances slowly behind a little guiding star and fades away behind itself as it goes; and a
-field of stars that each shimmer on their own. One canvas at ~30 fps, stopped as soon as the
-welcome screen goes. With reduced motion (which Windows also reports when its animation effects
-are off) the map stops drifting and holds still; the journeys and the stars carry on, as they are
-small, slow movements rather than the whole screen sliding. */
-// focusX0..focusX1: the span (map px) holding the continent and its roads.
-const WELCOME_MAP = { src: "telarun-map.jpg", w: 2000, h: 1500, focusX0: 150, focusX1: 1500 };
+The Telarun map, muted to the night-sky blue, shown in slow "shots" like a film: the map fades in
+close up over one of its roads, the camera drifting from a new direction and slowly zooming each
+time, while a white dashed line (Indiana Jones style) follows the road behind a little guiding
+star, with moonlit clouds drifting over it all. The star rests at the destination, the line
+fades away behind it, and the map and its clouds dissolve into the night sky; after a few
+seconds of just the stars, each shimmering on its own, the next shot opens somewhere else.
+One canvas at ~30 fps, stopped as soon as the welcome screen goes. With reduced
+motion (which Windows also reports when its animation effects are off) the camera holds still
+within each shot; the dissolves, journeys, clouds and stars carry on, as they are small or slow
+movements rather than the whole screen sliding. */
+const WELCOME_MAP = { src: "telarun-map.jpg", w: 2000, h: 1500 };
 // The map's roads, traced from the painted roads, as flat [x, y, x, y, …] lists in map px.
 const WELCOME_ROADS = {
   hammerhelm: [751,330, 747.5,338, 723,368, 718.5,379.5, 717.5,386.5, 723,401.5, 724,410, 722,422, 721,440, 719,456, 717.5,465.5, 712,480],
@@ -527,9 +529,10 @@ const WELCOME_ROADS = {
   west: [120,775, 119.5,778.5, 121.5,788, 136,800, 159.5,806.5, 181,808.5, 200.5,815.5, 221.5,816, 230.5,815, 250,808, 259.5,805.5, 275,803, 303.5,800.5, 330.5,813, 348,825.5, 354.5,832.5, 369,853.5, 377,859.5, 389.5,864, 412.5,860.5, 434.5,851.5, 451,841, 460,837, 493,834.5, 517,831.5, 550,828.5, 595,828, 604,826.5, 607,825],
   south: [824,1108, 814.5,1108.5, 805.5,1111, 797.5,1116, 790,1119.5, 782.5,1124.5, 776.5,1127.5, 767,1135.5, 760,1149.5, 760,1159, 762,1174, 761,1179, 776,1187, 799.5,1187, 820,1190, 828.5,1192, 850.5,1199.5, 870,1209, 893.5,1224.5, 921,1261.5, 929,1275, 937.5,1283.5, 944.5,1289.5, 970.5,1306.5, 979,1310, 995.5,1316, 1007.5,1318, 1037.5,1318, 1066.5,1314.5, 1084.5,1318, 1097,1315.5, 1118,1305.5, 1165.5,1279, 1196.5,1257, 1203,1251.5, 1204,1248],
 };
-// speed: map px per second · life: how long a dash stays before it starts to fade · fade ·
-// gap: pause between one journey's arrival and the next one's start · pan: one drift there and back.
-const WELCOME_TIMING = { start: 1000, speed: 38, life: 7000, fade: 3500, gap: 1800, pan: 140000 };
+// speed: map px per second the star travels · life: how long a dash stays before it starts to
+// fade · fade · open / close: the map fading in and out · lead: from the map appearing to the star
+// setting off · night: the stars-only pause between shots, at random between the two.
+const WELCOME_TIMING = { speed: 38, life: 7000, fade: 3500, open: 2600, close: 3500, lead: 1300, night: [2500, 7000] };
 
 // Every town-to-town route along the roads, each way round: a list of roads chained end to end
 // ("-name" runs a road backwards). Roads meet where their end points match; a road end no other
@@ -597,24 +600,63 @@ function startWelcomeBackdrop(screen) {
   const canvas = screen.querySelector(".start-backdrop");
   const g = canvas?.getContext("2d");
   if (!g) return () => {};
-  // Reduced motion only pins the map in place (see above).
-  const pinMap = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  // Reduced motion only holds the camera still within each shot (see above).
+  const holdStill = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const T = WELCOME_TIMING;
-  const journeys = welcomeRoutes().map((r) => ({ ...buildWelcomeJourney(r.names), from: r.from, to: r.to }));
+  const W = WELCOME_MAP.w;
+  const H = WELCOME_MAP.h;
+  // Each journey with its bounding box (map px), which shots frame on screen.
+  const journeys = welcomeRoutes().map((r) => {
+    const j = { ...buildWelcomeJourney(r.names), from: r.from, to: r.to };
+    const xs = j.pts.map((p) => p.x);
+    const ys = j.pts.map((p) => p.y);
+    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    j.box = { w: Math.max(80, x1 - x0), h: Math.max(80, y1 - y0), cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+    return j;
+  });
   let recent = []; // the last two journeys, newest first
-  let nextTripAt = T.start;
-  // Journeys under way or fading out.
-  let trips = [];
+  let shot = null; // the shot on screen, if any
+  let shots = 0;
+  let nextShotAt = Infinity; // the first one starts once the map has loaded
+  let cam = null; // where the camera looks, eased after where the shot aims it
+  let camAt = 0;
   const t0 = performance.now();
   let map = null; // the map, pre-tinted to the night-sky blue
-  let mapAt = 0;
   let stars = [];
+  let clouds = [];
   let view = { w: 0, h: 0, dpr: 1 };
   let raf = 0;
   let last = 0;
   let stopped = false;
 
-  // Size the canvas to the screen (capped so huge displays stay cheap) and scatter the stars.
+  const ease = (x) => {
+    const c = Math.min(1, Math.max(0, x));
+    return c * c * (3 - 2 * c);
+  };
+
+  // Cloud shapes, made once: soft overlapping glows, fuller in the middle than at the ends.
+  const cloudShapes = Array.from({ length: 5 }, () => {
+    const c = document.createElement("canvas");
+    c.width = 512;
+    c.height = 220;
+    const o = c.getContext("2d");
+    for (let i = 0; i < 24; i++) {
+      const u = Math.random();
+      const bulge = Math.sin(Math.PI * u);
+      const x = c.width * (0.12 + 0.76 * u);
+      const y = c.height * (0.62 - 0.18 * bulge * Math.random());
+      const r = c.height * (0.12 + 0.24 * bulge * (0.5 + 0.5 * Math.random()));
+      const glow = o.createRadialGradient(x, y, 0, x, y, r);
+      glow.addColorStop(0, "rgba(214, 224, 255, 0.5)");
+      glow.addColorStop(1, "rgba(214, 224, 255, 0)");
+      o.fillStyle = glow;
+      o.fillRect(x - r, y - r, 2 * r, 2 * r);
+    }
+    return c;
+  });
+
+  // Size the canvas to the screen (capped so huge displays stay cheap), and scatter the stars
+  // and the clouds.
   const fit = () => {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
@@ -635,6 +677,20 @@ function startWelcomeBackdrop(screen) {
       glint: Math.random() < 0.09,
       tint: tints[Math.floor(Math.random() * tints.length)],
     }));
+    // Nearer clouds are bigger, faster and brighter.
+    const size = Math.max(0.6, Math.min(1.4, w / 1440));
+    clouds = Array.from({ length: Math.round(4 + w / 320) }, (_, i) => {
+      const near = Math.random();
+      const scale = (0.55 + near * 0.9) * size;
+      return {
+        shape: cloudShapes[i % cloudShapes.length],
+        scale,
+        x0: Math.random(),
+        y: Math.random() * h - 110 * scale,
+        speed: (5 + near * 14) * size, // px per second
+        alpha: 0.08 + near * 0.12,
+      };
+    });
   };
 
   // A four-point star: the route's leading marker and the brightest stars' glints.
@@ -650,36 +706,156 @@ function startWelcomeBackdrop(screen) {
     g.fill();
   };
 
-  // Next journey: a random one of those (nearly) as much on screen as any right now, setting out
-  // from a town neither of the last two did, nor where the last one's star is still resting, and
-  // not just retracing the last one's steps.
-  const pickJourney = (X, Y, w, h) => {
-    const onScreen = (j) => {
-      const sample = j.pts.filter((p, i) => i % 2 === 0);
-      return sample.filter((p) => X(p.x) > 30 && X(p.x) < w - 30 && Y(p.y) > 30 && Y(p.y) < h - 30).length / sample.length;
-    };
+  // A shot: its journey and timeline, where on screen it frames the route, the direction the
+  // camera drifts and how much it zooms in (or out) over the shot. The journey is any route at
+  // random that this screen can frame well, setting out from a town neither of the last two did,
+  // nor the one the last journey ended at, and not heading back to where the last one set out.
+  const newShot = (t, w, h) => {
+    const first = !shots++;
     const fresh = journeys.filter(
       (j) => !recent.some((r) => r.from === j.from) && j.from !== recent[0]?.to && j.to !== recent[0]?.from
     );
-    const options = (fresh.length ? fresh : journeys).map((j) => ({ j, seen: onScreen(j) }));
-    const best = Math.max(...options.map((o) => o.seen));
-    const pool = options.filter((o) => o.seen >= Math.min(0.75, best - 0.1));
-    return pool[Math.floor(Math.random() * pool.length)].j;
+    const frames = freeFrames(w, h);
+    const framed = (fresh.length ? fresh : journeys).map((j) => ({ j, ...pickFrame(j, frames, w, h) }));
+    const leastMiss = Math.min(...framed.map((o) => o.miss));
+    const pool = framed.filter((o) => o.miss <= Math.max(leastMiss, 0.08 * Math.min(w, h)));
+    const { j, frame } = pool[Math.floor(Math.random() * pool.length)];
+    recent = [j, recent[0]].filter(Boolean);
+    const go = t + (first ? 700 : T.lead);
+    const close = go + (j.length / T.speed) * 1000 + T.life; // the last dashes start to fade
+    const end = close + T.close;
+    return {
+      j,
+      box: j.box,
+      frame,
+      size: `${w}x${h}`,
+      start: t,
+      open: first ? 1600 : T.open,
+      go,
+      close,
+      end,
+      next: end + T.night[0] + Math.random() * (T.night[1] - T.night[0]),
+      angle: Math.random() * 2 * Math.PI,
+      zoom: (Math.random() < 0.5 ? -1 : 1) * (0.06 + Math.random() * 0.1),
+    };
   };
 
-  // One journey: white dashes up to the head, each fading once it's been there for `life`, a ring
+  const headOf = (s, t) => Math.min(s.j.length, Math.max(0, ((t - s.go) / 1000) * T.speed));
+  // How much of the map shows: fading in as the shot opens, out as it closes.
+  const shown = (s, t) => ease((t - s.start) / s.open) * (1 - ease((t - s.close) / T.close));
+  // Close in: zoomed in from 1.25× to 2.2× the zoom that just covers the screen.
+  const zoomFor = (fit, w, h) => {
+    const cover = Math.max(w / W, h / H);
+    return Math.min(cover * 2.2, Math.max(cover * (holdStill ? 1 : 1.25), fit));
+  };
+  // The camera never looks past the edge of the map.
+  const keepInside = (x, y, z, w, h) => {
+    const hw = w / (2 * z);
+    const hh = h / (2 * z);
+    return {
+      x: 2 * hw >= W ? W / 2 : Math.min(W - hw, Math.max(hw, x)),
+      y: 2 * hh >= H ? H / 2 : Math.min(H - hh, Math.max(hh, y)),
+    };
+  };
+  // The camera position (map px) that puts map point (fx, fy) at the frame's centre on screen.
+  const lookAt = (f, fx, fy, z, w, h) => ({ x: fx - ((f.x - 0.5) * w) / z, y: fy - ((f.y - 0.5) * h) / z });
+
+  // Where on screen a route can go without running behind the logo, text or buttons (as frames:
+  // centre and size, in fractions of the screen): beside the centre column, or in the gaps above,
+  // between and below its parts. Measured from the page, so it suits every screen shape.
+  const freeFrames = (w, h) => {
+    const rectOf = (selector) => screen.querySelector(selector)?.getBoundingClientRect();
+    const blocks = [".start-logo > g", ".start-tagline", ".start-actions", ".start-demo", ".start-footer"]
+      .map(rectOf)
+      .filter((r) => r?.height);
+    const column = blocks.filter((r) => r.left < w / 2 && r.right > w / 2);
+    const left = Math.min(w / 2, ...column.map((r) => r.left));
+    const right = Math.max(w / 2, ...column.map((r) => r.right));
+    const demo = rectOf(".start-demo");
+    const frames = [];
+    const add = (x0, y0, x1, y1) => {
+      const fw = (x1 - x0) * 0.88;
+      const fh = (y1 - y0) * 0.84;
+      if (fw > 0.22 * w && fh > 0.12 * h) frames.push({ x: (x0 + x1) / (2 * w), y: (y0 + y1) / (2 * h), w: fw / w, h: fh / h });
+    };
+    add(0, 0.08 * h, left, 0.92 * h);
+    add(right, 0.08 * h, w, demo && demo.left > right ? demo.top : 0.92 * h); // above a corner demo button
+    let y = 0;
+    for (const r of [...blocks.sort((a, b) => a.top - b.top), { top: h, bottom: h }]) {
+      add(0, y, w, r.top);
+      y = Math.max(y, r.bottom);
+    }
+    return frames.length ? frames : [{ x: 0.5, y: 0.5, w: 0.9, h: 0.8 }];
+  };
+
+  // Pick where on screen to frame journey j: where the route fits best (or nearly as well, at
+  // random), among the frames the map's edge doesn't keep it out of. `miss` is how far (screen
+  // px) the edge stops the camera from bringing the route's middle (and, for a route too big for
+  // its frame, which the camera follows, either end) to the frame.
+  const pickFrame = (j, frames, w, h) => {
+    const { box } = j;
+    const options = frames.map((f) => {
+      const fit = Math.min((f.w * w) / box.w, (f.h * h) / box.h);
+      const z = zoomFor(fit, w, h);
+      const spots = [{ x: box.cx, y: box.cy }];
+      if (fit < z) spots.push(j.pts[0], j.pts[j.pts.length - 1]);
+      const miss = Math.max(
+        ...spots.map((p) => {
+          const want = lookAt(f, p.x, p.y, z, w, h);
+          const got = keepInside(want.x, want.y, z, w, h);
+          return Math.hypot(got.x - want.x, got.y - want.y) * z;
+        })
+      );
+      return { f, fit, miss };
+    });
+    const leastMiss = Math.min(...options.map((o) => o.miss));
+    const placeable = options.filter((o) => o.miss <= Math.max(leastMiss, 0.08 * Math.min(w, h)));
+    const best = Math.max(...placeable.map((o) => o.fit));
+    const pool = placeable.filter((o) => o.fit >= best * 0.7);
+    return { frame: pool[Math.floor(Math.random() * pool.length)].f, miss: leastMiss };
+  };
+
+  // Where the shot aims the camera at time t: the route sits in its frame on screen, drifting
+  // across it while the camera slowly zooms; and when the route is too big for its frame, the
+  // camera follows the star, keeping it inside the frame.
+  const aim = (s, t, w, h) => {
+    if (s.size !== `${w}x${h}`) {
+      s.size = `${w}x${h}`;
+      s.frame = pickFrame(s.j, freeFrames(w, h), w, h).frame;
+    }
+    const { box, frame: f } = s;
+    const z0 = zoomFor(Math.min((f.w * w) / box.w, (f.h * h) / box.h), w, h);
+    if (holdStill) return { ...lookAt(f, box.cx, box.cy, z0, w, h), z: z0 };
+    const k = (t - s.start) / (s.end - s.start); // 0 → 1 over the shot
+    const z = z0 * (1 + s.zoom * (k - 0.5));
+    const drift = ((k - 0.5) * 0.22 * w) / z;
+    const at = lookAt(f, box.cx, box.cy, z, w, h);
+    at.x -= Math.cos(s.angle) * drift;
+    at.y -= Math.sin(s.angle) * drift;
+    const star = journeyPointAt(s.j, headOf(s, t));
+    const sx = w / 2 + (star.x - at.x) * z;
+    const sy = h / 2 + (star.y - at.y) * z;
+    // (the inner 80% of the frame, leaving room for the camera's easing to catch up)
+    const [x0, x1, y0, y1] = [(f.x - f.w * 0.4) * w, (f.x + f.w * 0.4) * w, (f.y - f.h * 0.4) * h, (f.y + f.h * 0.4) * h];
+    at.x += (Math.max(0, sx - x1) - Math.max(0, x0 - sx)) / z;
+    at.y += (Math.max(0, sy - y1) - Math.max(0, y0 - sy)) / z;
+    return { ...at, z };
+  };
+
+  // The journey: white dashes up to the head, each fading once it's been there for `life`, a ring
   // at the start, and the guiding star at the head, which rests at the destination and fades
-  // away with the last dashes.
-  const drawTrip = (trip, t, X, Y, s) => {
-    const { j } = trip;
-    const elapsed = t - trip.start;
-    const head = Math.min(j.length, (elapsed / 1000) * T.speed);
+  // away with the last dashes. Everything also fades with the map (`shownNow`).
+  const drawTrip = (s, t, X, Y, z, shownNow) => {
+    const { j } = s;
+    const elapsed = t - s.go;
+    const head = headOf(s, t);
     const alphaAt = (d) => {
       const age = elapsed - (d / T.speed) * 1000;
-      return age < T.life ? 1 : Math.max(0, 1 - (age - T.life) / T.fade);
+      return shownNow * (age < T.life ? 1 : Math.max(0, 1 - (age - T.life) / T.fade));
     };
-    const period = 14 / s; // 8 px dash + 6 px gap on screen, in map px
-    const dash = 8 / s;
+    const appear = ease((elapsed + 600) / 600); // the ring and the star, just before setting off
+    const period = 14 / z; // 8 px dash + 6 px gap on screen, in map px
+    const dash = 8 / z;
     g.strokeStyle = "#ffffff";
     g.lineWidth = 2.6;
     g.lineCap = "round";
@@ -698,14 +874,14 @@ function startWelcomeBackdrop(screen) {
       g.stroke();
     }
     g.lineWidth = 2;
-    const startAlpha = alphaAt(0);
+    const startAlpha = alphaAt(0) * appear;
     if (startAlpha > 0) {
       g.globalAlpha = 0.9 * startAlpha;
       g.beginPath();
       g.arc(X(j.pts[0].x), Y(j.pts[0].y), 5, 0, Math.PI * 2);
       g.stroke();
     }
-    const starAlpha = head >= j.length ? alphaAt(j.length) : 1;
+    const starAlpha = (head >= j.length ? alphaAt(j.length) : shownNow) * appear;
     if (starAlpha > 0) {
       const p = journeyPointAt(j, head);
       g.globalAlpha = starAlpha;
@@ -724,41 +900,32 @@ function startWelcomeBackdrop(screen) {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
 
-    // The map, slightly larger than the screen, drifting corner to corner and back along the
-    // diagonal, starting from the middle (u = 0.5).
-    const s = 1.18 * Math.max(w / WELCOME_MAP.w, h / WELCOME_MAP.h);
-    const u = pinMap ? 0.5 : 0.5 + 0.5 * Math.sin((2 * Math.PI * t) / T.pan);
-    const halfW = w / (2 * s);
-    const halfH = h / (2 * s);
-    // Narrow (phone) screens drift over the continent's half rather than out to sea.
-    let x0 = halfW;
-    let x1 = WELCOME_MAP.w - halfW;
-    if (WELCOME_MAP.focusX1 - WELCOME_MAP.focusX0 > 2 * halfW) {
-      x0 = Math.max(x0, WELCOME_MAP.focusX0 + halfW);
-      x1 = Math.min(x1, WELCOME_MAP.focusX1 - halfW);
-    }
-    const cx = x0 + (x1 - x0) * u;
-    const cy = halfH + (WELCOME_MAP.h - 2 * halfH) * u;
-    const ox = w / 2 - cx * s;
-    const oy = h / 2 - cy * s;
-    const X = (x) => ox + x * s;
-    const Y = (y) => oy + y * s;
-    if (map) {
-      g.globalAlpha = 0.42 * Math.min(1, (now - mapAt) / 1600);
-      g.drawImage(map, ox, oy, WELCOME_MAP.w * s, WELCOME_MAP.h * s);
-    }
-
-    // Journeys along the roads, one after another: the dashed line advances slowly behind the
-    // guiding star and fades away behind itself, so each journey eventually disappears.
-    if (map) {
-      if (t >= nextTripAt) {
-        const j = pickJourney(X, Y, w, h);
-        recent = [j, recent[0]].filter(Boolean);
-        trips.push({ j, start: t });
-        nextTripAt = t + (j.length / T.speed) * 1000 + T.gap;
+    // The shot on screen, if any: the map, then the journey along its road. Between shots,
+    // just the night sky.
+    let shownNow = 0;
+    if (map && !shot && t >= nextShotAt) shot = newShot(t, w, h);
+    if (shot) {
+      const target = aim(shot, t, w, h);
+      // The camera eases after its aim, so following the star round a bend doesn't jolt it.
+      if (!cam) cam = target;
+      const k = 1 - Math.exp(-(t - camAt) / 800);
+      cam = { x: cam.x + (target.x - cam.x) * k, y: cam.y + (target.y - cam.y) * k, z: target.z };
+      camAt = t;
+      const { z } = cam;
+      const c = keepInside(cam.x, cam.y, z, w, h);
+      const ox = w / 2 - c.x * z;
+      const oy = h / 2 - c.y * z;
+      const X = (x) => ox + x * z;
+      const Y = (y) => oy + y * z;
+      shownNow = shown(shot, t);
+      g.globalAlpha = 0.42 * shownNow;
+      g.drawImage(map, ox, oy, W * z, H * z);
+      drawTrip(shot, t, X, Y, z, shownNow);
+      if (t >= shot.end) {
+        nextShotAt = shot.next;
+        shot = null;
+        cam = null;
       }
-      trips = trips.filter((trip) => t < trip.start + (trip.j.length / T.speed) * 1000 + T.life + T.fade);
-      trips.forEach((trip) => drawTrip(trip, t, X, Y, s));
     }
 
     // Stars, each shimmering on its own rhythm; the brightest flash a glint at their peak.
@@ -775,6 +942,17 @@ function startWelcomeBackdrop(screen) {
         g.globalAlpha = alpha * k;
         sparkle(st.x, st.y, st.r * (3 + 5 * k), st.r * 0.35, Math.PI / 4);
       }
+    }
+
+    // Clouds drifting across on the wind. They come and go with the map, so the night sky
+    // between shots is clear.
+    for (const c of clouds) {
+      if (shownNow <= 0) break;
+      const cw = c.shape.width * c.scale;
+      const span = w + cw;
+      const x = ((c.x0 * span + (c.speed * t) / 1000) % span) - cw;
+      g.globalAlpha = c.alpha * shownNow;
+      g.drawImage(c.shape, x, c.y, cw, c.shape.height * c.scale);
     }
     g.globalAlpha = 1;
   };
@@ -800,7 +978,7 @@ function startWelcomeBackdrop(screen) {
     o.globalCompositeOperation = "luminosity";
     o.drawImage(img, 0, 0);
     map = off;
-    mapAt = performance.now();
+    nextShotAt = performance.now() - t0;
   };
   img.src = WELCOME_MAP.src;
 
