@@ -1,87 +1,144 @@
-# Lodestar
+<p align="center">
+  <a href="https://lodestarvtt.com"><img src="Lodestar.svg" alt="Lodestar" width="420"></a>
+</p>
 
-**▶️ [Try it live](https://lodestarvtt.com)** — runs instantly in your browser, no install. · **📖 [User manual](https://lodestarvtt.com/manual.html)** — every tool, with pictures.
+<p align="center">
+  <b>A battlemap display tool for game masters.</b><br>
+  Cast a map with fog of war to your players' screen while you run everything from a private GM panel.<br>
+  Free, open source, and it runs entirely in your browser: no account, no install, no server.
+</p>
 
-A local-first battlemap display tool for game masters. Cast a map with fog of war to a second "player" screen while you control everything from a private GM panel. Lodestar runs entirely in the browser with **no build step and no dependencies** — open `index.html` and go. It's structured so it can later be wrapped as a desktop app (Electron, Tauri, or WebView2).
+<p align="center">
+  <a href="https://lodestarvtt.com"><b>▶ Try it live</b></a> ·
+  <a href="https://lodestarvtt.com/manual.html"><b>📖 User manual</b></a> ·
+  <a href="https://github.com/UnclePlants/Lodestar/releases/latest"><b>⬇ Download</b></a>
+</p>
 
-## Screenshots
+<p align="center">
+  <a href="https://github.com/UnclePlants/Lodestar/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/UnclePlants/Lodestar?style=flat-square&color=b1c301&label=release"></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/github/license/UnclePlants/Lodestar?style=flat-square&color=b1c301"></a>
+  <img alt="No build step, no dependencies" src="https://img.shields.io/badge/dependencies-none-b1c301?style=flat-square">
+</p>
 
-![Lodestar — GM view (left) with named fog areas, and the player view (right) showing fog of war](screenshot.png)
+![The Lodestar GM screen: the control panel, the tool bar, a courtyard map with named fog areas, tokens, an area-of-effect marker and the initiative order](manual/gm-screen.jpg)
 
-*GM view on the left with named fog areas ("Chapel", "Library"); the player display on the right shows only what's been revealed.*
+## Quick start
 
-> Demo map: "Chapel of the Bountiful Harvest" (#287) by [Elven Tower Adventures](https://elventower.com), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Modified — fog-of-war overlay added in Lodestar.
+1. Open **[lodestarvtt.com](https://lodestarvtt.com)**, or click **Try the demo** for a ready-made three-floor map with fog, tokens, initiative and music.
+2. **Load a map** with the first button in the GM panel: an image, an animated GIF, or a video.
+3. Click **Open player display**, drag that window onto your TV or second screen, and press **F** for fullscreen.
+4. Cover the map with **fog**, then reveal rooms as the party explores. Your players only ever see what you've revealed.
+5. **Save map** keeps the whole setup in your browser's library, ready for next session.
+
+Prefer to run it offline? [Download the latest release](https://github.com/UnclePlants/Lodestar/releases/latest), unzip it, and open `index.html`. It works the same.
+
+## A quick tour
+
+<table>
+  <tr>
+    <td width="50%"><a href="https://lodestarvtt.com/manual.html#fog"><img src="manual/fog.jpg" alt="Fog of war tools"></a><br><b>Fog of war</b>: trace, draw, paint or bucket-fill fog, and name areas so you can reveal a whole room at once.</td>
+    <td width="50%"><a href="https://lodestarvtt.com/manual.html#cast"><img src="manual/player-display.png" alt="GM view with the red player frame beside the player view"></a><br><b>Player display</b>: the red frame on your screen is exactly what your players see. Drag it to move their view.</td>
+  </tr>
+  <tr>
+    <td><a href="https://lodestarvtt.com/manual.html#tokens"><img src="manual/tokens.jpg" alt="A token stepping across the grid with its path and distance"></a><br><b>Tokens</b>: drag or step tokens on the grid, with the path and distance traced as they go.</td>
+    <td><a href="https://lodestarvtt.com/manual.html#initiative"><img src="manual/initiative.jpg" alt="The initiative tracker beside the map"></a><br><b>Initiative</b>: turn order, HP, concentration, and a turn ring on the active combatant's token.</td>
+  </tr>
+  <tr>
+    <td><a href="https://lodestarvtt.com/manual.html#aoe"><img src="manual/aoe.jpg" alt="Area-of-effect templates on the map"></a><br><b>Areas of effect</b>: live spell templates on both screens, or pin them as persistent markers.</td>
+    <td><a href="https://lodestarvtt.com/manual.html#dice"><img src="manual/dice.jpg" alt="3D dice settled on the map with the dice tray open"></a><br><b>3D dice</b>: physically simulated dice, rolled in secret or thrown on the players' screen too.</td>
+  </tr>
+</table>
 
 ## Features
 
-- **Maps** — load high-resolution map images, animated GIFs (or animated WebP/PNG), or video maps (MP4/WebM) from local disk; pan and zoom freely. Animated maps loop on both screens beneath the fog, grid, and tokens (videos stay in step between the GM and player screens); a *Play animated map* switch in View pauses them. Videos play muted (use the music player for table audio).
-- **Player display** — open a second window, drag it to another screen, and cast the map to your players. The player window can go fullscreen. You drive the player's framing from the GM panel — match the GM view, fit the map to the player screen, set zoom/position, or rotate the player view independently. A red frame (color and opacity adjustable) on the GM screen shows exactly what the players currently see; drag it to pan the player display without moving your own view.
-- **In-person play on a TV** — lay a TV flat as the battlemap, zoom until one grid square matches your minis, and lock the square size: it then stays the same physical size across every map (re-derived from each map's calibrated grid).
-- **Initiative tracker** — a dockable turn-order panel: add players, NPCs, and monsters with initiative and HP, advance turns and rounds, track damage/healing with HP bars. A compact order overlay can be shown in the corner of the GM screen and/or the player display independently; it stays put when the panel is closed and has its own turn arrows so you can advance the round without reopening the panel; each row also has a **C** toggle to mark a combatant as concentrating, mirrored as a badge in the order overlay for GM and players alike. Link a row to a token on the map: the active combatant's token wears a turn ring, and linked tokens show a GM-only HP bar.
-- **Area of effect** — hover a live spell template (circle, square, or cone) over the map in any color and size; it mirrors to the player display in real time. The cone rotates with the mouse wheel or a direction slider. Click to leave it on the map as a persistent marker (Grease, Wall of Fire…) with an optional GM-only label and a per-marker show-to-players toggle.
-- **Music & sound** — two looping layers (music + ambience) that play together, a one-shot SFX soundboard, and saved scenes that recall the whole mix; everything is mirrored to the player display so the table hears it.
-- **Fog of war**
-  - Trace polygon areas, or name them with a GM-only label.
-  - Drag-draw fog shapes (rectangle, square, ellipse, circle, triangle) for quick rooms.
-  - Paint fog with a round or square brush of adjustable size, or fill the whole map at once with the bucket.
-  - Erase freeform (brush/bucket) fog with the eraser — erased areas can be painted over again normally.
-  - Right-click a polygon area to remove it and clear the brush/bucket fog inside it (other polygon areas are left intact).
-  - Tokens and images sit *beneath* the fog, so anything in an unrevealed area is hidden (solid black for players, dimmed under the GM tint).
-  - Named-area labels wrap and truncate so a long name never overflows its cartouche.
-  - GM sees fog as an adjustable tint/opacity; players see solid black.
-- **Multi-floor** — build multi-level locations; each floor has its own map, fog, tokens, and stairs. Navigate with the on-screen floor widget.
-- **Stairs** — place GM-only staircase arrows (color adjustable in the Floors section) that link floors; they scale with the grid and zoom and are invisible to players.
-- **Rotate** — rotate the GM map in 90° steps (fog, tokens, and stairs all ride along, and the player follows), or rotate just the player display independently so it reads right-side up from across the table.
-- **Tokens** — drop, drag, label, color, size, or give them a custom image; they snap to the grid and appear on both displays. Bulk-add tokens by multi-selecting image files (one token per image). In Move mode, click a token to select it (or drag to move it). A selected token gets 8 pop-out orientation arrows for stepping in any direction (including diagonals), and the arrow keys nudge it too; both trace the actual path and show the distance moved with the 5e alternating-diagonal rule. Dragging shows the distance as well. Delete removes a selected token. A selected token's colour, size, label and image edit live, and it can carry a GM-only note (shown on hover) or be hidden from players entirely (stealth tokens are never sent to the player display).
-- **3D dice roller** — press `D` (or the d20 button) for a dice tray: build a roll from the pad or type notation (`1d20+5`, `4d6dl1`, `2d20kh1`, `d%`), with one-click advantage/disadvantage. Physically simulated d4–d20 and d100 dice tumble across the map and settle on their result; tick *Players see the roll* to throw the identical dice on the player display, or keep it a secret GM roll. Recent rolls re-roll with a click. No libraries — it's all in `dice.js`.
-- **Map images** — drag an image file onto the map (or use the image button in the map toolbar) to place it; move, resize, and rotate it, optionally snap it to the grid, and toggle per-image whether players can see it (hidden from players by default).
-- **Notes** — drop GM-only rich-text sticky notes on the map with the note tool; type straight into them (font, size, bold/italic/underline/strikethrough), drag the title strip to move, drag the corner to resize. Notes never appear on the player display.
-- **PDF resources** — open character sheets, stat blocks, or rules PDFs in floating, resizable GM-only windows beside the map.
-- **Grid** — toggle and adjust size, offset, color, opacity, and token snapping. Calibrate quickly by dragging a square over one cell: this sets the cell size *and* aligns the grid to that cell, so tokens snap onto a map's own printed grid even with the overlay off.
-- **Ping** — Alt+click draws an animated marker on both displays.
-- **Measure** — reports distance in grid cells and your choice of imperial (feet) or metric (meters). The same drag-a-square calibration sets the ruler scale, working whether or not the grid overlay is shown.
-- **Splash / blackout** — show a splash image or a plain black screen on the player display instead of the map.
-- **Library** — save full setups (map image or video, grid, fog, tokens, floors, views) to a local IndexedDB library; export/import the whole library as JSON for backups or moving machines.
-- **Undo / redo** and **fit-to-screen**.
-- **Built-in help** — press `?` for the shortcut cheatsheet, which also links to the [user manual](https://lodestarvtt.com/manual.html). Click **Try the demo** on the welcome screen to open a ready-made three-floor map with fog, tokens, initiative, and music.
+### Maps and the player display
 
-## Run
+- **Any map**: high-resolution images, animated GIF/WebP/PNG, or MP4/WebM video maps from your own disk. Animated maps loop on both screens under the fog, grid and tokens, and videos stay in step between them.
+- **Player display**: a second window for your TV, projector or second monitor. It can follow your view, fit the whole map, or keep its own zoom, position and rotation. A red frame on the GM screen shows what the players see; drag it to pan their view without moving yours.
+- **TV-table scale**: lay a TV flat, zoom until one grid square matches your minis, and lock it. Every map then keeps that physical square size.
+- **Multiple floors**: each floor has its own map, fog and tokens, linked by GM-only stairs.
+- **Rotate** the map in 90° steps, or rotate just the player display so it reads the right way up from across the table.
+- **Splash screen and blackout** to show an image or a black screen between scenes.
 
-Use the **[hosted version](https://lodestarvtt.com)**, or download the source and open `index.html` in a modern browser — both work identically and run fully offline once loaded. Load a map, click **Open player display**, and move that window to your second screen (press **F** or double-click for fullscreen).
+### Fog of war
 
-Use **Save map** to store the full setup in the local library and **My maps** to restore one. Use **Export** / **Import** in the GM panel to back the library up to a file.
+- Trace polygon areas and give them GM-only names.
+- Drag out rectangles, squares, ellipses, circles and triangles for quick rooms.
+- Paint fog with a round or square brush, fill the whole map with the bucket, and erase freely.
+- Right-click a traced area to reveal it, clearing any painted fog inside it too.
+- You see the fog as an adjustable tint; players see solid black. Tokens and images under the fog stay hidden from them.
+
+### Tokens and combat
+
+- **Tokens** with labels, colours, sizes or your own images, snapping to the grid. Add a batch by picking several image files at once. Select a token to edit it, give it a GM-only note, or hide it from players entirely.
+- **Movement**: step a selected token with its pop-out arrows or the arrow keys; the path and distance are traced (5e alternating diagonals).
+- **Initiative tracker**: turn order, rounds, HP bars, damage and healing, and a **C** toggle for concentration. Link a row to a token for a turn ring and a GM-only HP bar. A compact order overlay can sit on your screen, the players', or both.
+- **Areas of effect**: circle, square and cone templates in any colour and size, live on both screens. Click to pin one as a marker (Grease, Wall of Fire…) with an optional label.
+- **3D dice roller**: build a roll on the pad (click a die to add it, right-click to take one off, **Clear** to start again) or type it: `1d20+5`, `4d6dl1`, `2d20kh1`, `d%`. One click for advantage or disadvantage. The dice really tumble and settle; tick *Players see the roll* to throw the very same dice on the player display, or keep it a secret GM roll.
+- **Measure** in feet or metres, and **ping** any spot with Alt+click.
+
+### At the table
+
+- **Music and sound**: a music layer and an ambience layer that loop together, a one-shot SFX soundboard, and saved scenes that recall the whole mix. Sound plays on the player display.
+- **Handouts**: drop an image on the map, then move, resize and rotate it. Each one is hidden from players until you show it.
+- **GM notes**: rich-text sticky notes on the map, never shown to players.
+- **PDF windows**: open character sheets, stat blocks or rules beside the map.
+- **Grid**: size, offset, colour and opacity. Drag a square over one cell of the map's printed grid to calibrate the grid, token snapping and the ruler in one go.
+- **Undo and redo**, a **map library** with export and import, and a built-in shortcut sheet (press `?`).
+
+The [user manual](https://lodestarvtt.com/manual.html) walks through every tool, with pictures.
 
 ## Saving and backups
 
-When you save a map, everything (the image, fog, tokens, floors, grid, and view) is stored in your browser's own local storage (IndexedDB) on your machine. Nothing is ever uploaded to GitHub or anywhere else: the hosted version is just static files with no server behind it, so your maps never leave your computer. Because this storage is tied to a specific browser, device, and site address, a saved library only shows up when you reload from the same place you saved it. Maps saved on the hosted version won't appear if you later open a downloaded copy of `index.html` (a different address), or in a different browser, on another device, or in a private/incognito window. Clearing your browser's site data will also erase the library.
+Everything you save (the map, fog, tokens, floors, grid and view) is stored in your browser's own storage (IndexedDB) on your computer. Nothing is ever uploaded: the hosted site is just static files with no server behind it.
 
-Downloading the local version is the same story. The download contains only the program files, not your maps, so a fresh copy opened on another computer starts with an empty library and won't pull in maps you saved elsewhere. Saving there writes to that computer's own browser storage, and each machine keeps its own separate library that never syncs on its own.
+That storage belongs to one browser, on one device, at one address. Maps saved on lodestarvtt.com won't appear in a downloaded copy, in another browser, on another computer, or in a private window, and clearing your browser's site data erases them.
 
-For anything you want to keep, use **Export** in the GM panel to save your whole library to a single JSON file you control, then **Import** it wherever you need it. That exported file is the only copy that isn't dependent on a browser setting, so it's the safe way to back up your maps or carry them from one computer to another.
+To keep your maps safe or move them to another computer, use **Export** in the GM panel. It saves your whole library to one JSON file that you can **Import** anywhere.
 
 ## Keyboard shortcuts (GM)
 
-- `V` move · `P` polygon fog · `N` named fog area · `B` brush · `E` eraser · `T` tokens · `A` area of effect · `M` measure · `S` stairs · `D` dice roller
-- `F` fit map · `[` / `]` brush size · `Ctrl+Z` undo · `Ctrl+Shift+Z` redo
-- Arrow keys pan the map · `+` / `-` zoom (when no token is selected)
-- **Middle-mouse drag** pans the map in any tool, so you never have to switch tools just to reposition.
-- Polygon mode: click corners, `Enter` to place, `Esc` to cancel. `Ctrl+Z` or `Backspace` removes just the last point you placed.
-- With a token selected, arrow keys nudge it one cell · `Delete` removes the selected token, image, or AoE marker
-- `Alt+click` anywhere to ping · right-click a token, fog area, AoE marker, or stair to delete it · double-click an AoE marker to edit its label
-- `?` opens the in-app cheatsheet
-
-## Coordinate model
-
-Fog, rooms, tokens, pings, measures, and stairs are all stored in **native image pixels**, so they stay glued to the map regardless of zoom or the "Map image size" slider. The view is expressed as a centered map point plus a zoom level, which is why **Match GM view** frames the same region on the player screen even though the two windows are different sizes. Fog is rasterized into an offscreen layer capped at 4096px on the long edge to bound memory on very large maps. Older save files are migrated automatically on load.
+| Keys | Action |
+| --- | --- |
+| `V` `P` `N` `B` `E` `T` `A` `M` `S` | Move · polygon fog · named fog area · brush · eraser · tokens · area of effect · measure · stairs |
+| `D` | Dice roller |
+| `F` | Fit the map to the screen |
+| `[` / `]` | Brush size |
+| `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / redo |
+| Arrow keys · `+` / `-` | Pan · zoom (with no token selected) |
+| Arrow keys | Nudge the selected token one cell |
+| Middle-mouse drag | Pan the map with any tool |
+| `Enter` / `Esc` / `Backspace` | Polygon: place it / cancel / remove the last point |
+| `Delete` | Remove the selected token, image or AoE marker |
+| `Alt+click` | Ping |
+| Right-click | Delete a token, fog area, AoE marker or stair |
+| Double-click an AoE marker | Edit its label |
+| `?` | Shortcut cheatsheet |
 
 ## Browser support
 
-Tested on current Chromium-based browsers (Chrome, Edge). Requires `BroadcastChannel`, `IndexedDB`, `ResizeObserver`, and Canvas 2D — all standard in modern browsers. Animated GIF/WebP/PNG maps use `ImageDecoder` (WebCodecs); browsers without it show the first frame. Video maps play whatever formats the browser supports — MP4 (H.264) and WebM are the safe choices. The GM and player windows communicate over both `BroadcastChannel` and direct `window.postMessage`, so the cast works even when opened from `file://`.
+Made for current Chromium browsers (Chrome, Edge). Lodestar needs `BroadcastChannel`, `IndexedDB`, `ResizeObserver` and Canvas 2D, which every modern browser has. Animated GIF/WebP/PNG maps use `ImageDecoder` (WebCodecs); browsers without it show the first frame. Video maps play whatever the browser supports, so MP4 (H.264) and WebM are the safe choices. The GM and player windows talk over both `BroadcastChannel` and `window.postMessage`, so casting works even from `file://`.
+
+## For developers
+
+Lodestar is plain HTML, CSS and JavaScript with **no build step and no dependencies**: open `index.html` and it runs.
+
+| File | What's in it |
+| --- | --- |
+| `index.html` | The GM and player UI, and the welcome screen |
+| `app.js` | Everything else: maps, fog, tokens, floors, sync between windows, the library |
+| `dice.js` | The dice roller: notation parser, rigid-body physics, and the 3D renderer |
+| `styles.css` | All styling |
+| `manual.html` | The user manual (images in `manual/`) |
+
+Fog, tokens, pings, measurements and stairs are stored in **native image pixels**, so they stay glued to the map at any zoom. A view is a centred map point plus a zoom level, which is why **Match GM view** frames the same region on a player screen of a different size. Fog is rasterised into an offscreen layer capped at 4096 px on the long edge. Older save files are migrated automatically when they load. The app is structured so it can later be wrapped as a desktop app (Electron, Tauri or WebView2).
+
+Issues and pull requests are welcome.
 
 ## Credits
 
-See [CREDITS.md](CREDITS.md) for third-party icon attributions, demo artwork, and thanks to the community members whose ideas shaped Lodestar's features.
+See [CREDITS.md](CREDITS.md) for icon attributions, the demo's map and music, and thanks to the community members whose ideas shaped Lodestar. The demo map is **"Tearooms"** by [Fantasy Atlas](https://www.patreon.com/c/Fantasy_Atlas/home).
 
 ## License
 
-Lodestar is released under the [MIT License](LICENSE). Bundled icons are under their respective open-source licenses (see [CREDITS.md](CREDITS.md)).
+Lodestar is released under the [MIT License](LICENSE). Bundled icons are under their own open-source licenses (see [CREDITS.md](CREDITS.md)).
