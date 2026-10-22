@@ -203,12 +203,12 @@ button:hover {
 /* The demo, tucked in the bottom-right corner under a "Try it now" label, with a slow lime
    pulse to catch the eye. On narrower screens it joins the flow below the main button. */
 .start-demo {
-  align-items: flex-end;
+  align-items: center;
   animation: start-rise 0.7s ease 0.85s both;
   bottom: 26px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   position: fixed;
   right: 28px;
   z-index: 2;
@@ -221,10 +221,71 @@ button:hover {
   font-style: italic;
   font-weight: 600;
   line-height: 1;
-  margin-right: 6px;
   text-shadow: 0 1px 10px rgba(6, 2, 28, 0.95), 0 0 3px rgba(6, 2, 28, 0.9);
   transform: rotate(-4deg);
   white-space: nowrap;
+}
+
+/* The label is centred over the button; its doodled arrow hangs off the end of the text and
+   curls down onto the button, so it never shifts the label off-centre. */
+.start-try {
+  display: inline-block;
+  position: relative;
+}
+
+.start-try-text {
+  display: inline-block;
+}
+
+.start-try-arrow {
+  animation: start-try-nudge 3.4s ease-in-out 2.8s infinite;
+  fill: none;
+  filter: drop-shadow(0 1px 3px rgba(6, 2, 28, 0.95));
+  height: 48px;
+  left: calc(100% + 1px);
+  overflow: visible;
+  position: absolute;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+  top: -22px;
+  width: 46px;
+}
+
+.start-try-line,
+.start-try-head {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+.start-try-line {
+  animation: start-draw 0.8s ease-out 1.4s both;
+}
+
+.start-try-head {
+  animation: start-draw 0.25s ease-out 2.15s both;
+}
+
+@keyframes start-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Every few seconds the arrow nudges toward the button. */
+@keyframes start-try-nudge {
+  0%,
+  72%,
+  100% {
+    transform: translate(0, 0);
+  }
+  82% {
+    transform: translate(-2px, 4px);
+  }
+  91% {
+    transform: translate(0, 0);
+  }
 }
 
 .start-btn-demo {
@@ -300,10 +361,6 @@ button:hover {
     position: relative;
     right: auto;
   }
-
-  .start-try-text {
-    margin-right: 0;
-  }
 }
 
 /* Phones: the buttons go full-width. */
@@ -330,6 +387,11 @@ button:hover {
 @media (prefers-reduced-motion: reduce) {
   .start-screen * {
     animation: none !important;
+  }
+
+  .start-try-line,
+  .start-try-head {
+    stroke-dashoffset: 0;
   }
 
   .start-btn,
@@ -2959,12 +3021,18 @@ input:disabled {
 
 .dice-fab svg {
   fill: none;
-  height: 24px;
+  height: 26px;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.6;
-  width: 24px;
+  stroke-width: 1.3;
+  width: 26px;
+}
+
+/* d20 seen face-on: the hexagon outline, the central face (lightly filled) and its edges. */
+.d20-icon path:nth-child(2) {
+  fill: currentColor;
+  fill-opacity: 0.22;
 }
 
 .dice-panel {
@@ -3023,15 +3091,85 @@ input:disabled {
   font-weight: 600;
   min-height: 34px;
   padding: 0;
+  position: relative;
 }
 
 .dice-pad button:hover {
   border-color: var(--accent-2);
 }
 
-#diceClear {
+.dice-pad .dice-pad-wide {
+  grid-column: span 2;
+}
+
+/* A die that is in the roll: outlined, with how many of it in a corner badge. */
+.dice-pad button.has-dice {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dice-count {
+  background: var(--accent);
+  border-radius: 999px;
+  color: var(--bg, #0b0820);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 16px;
+  min-width: 16px;
+  padding: 0 4px;
+  pointer-events: none;
+  position: absolute;
+  right: -5px;
+  top: -6px;
+}
+
+.dice-hint {
   color: var(--muted);
+  font-size: 0.72rem;
+  margin: -4px 0 0;
+  text-align: center;
+}
+
+.dice-expr-row {
+  display: flex;
+  gap: 6px;
+}
+
+/* width: 0 so the input's built-in ~20ch size can't push the panel wider than its 272px. */
+.dice-expr-row .dice-expr {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+}
+
+.dice-clear {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.82rem;
   font-weight: 500;
+  gap: 4px;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.dice-clear svg {
+  fill: none;
+  height: 13px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2.4;
+  width: 13px;
+}
+
+.dice-clear:not(:disabled):hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.dice-clear:disabled {
+  cursor: default;
+  opacity: 0.4;
 }
 
 .dice-expr {
