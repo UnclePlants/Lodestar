@@ -136,6 +136,7 @@
     <li><a href="#about">What Lodestar is</a></li>
     <li><a href="#start">Getting started</a></li>
     <li><a href="#cast">The player display</a></li>
+    <li><a href="#weather">Weather</a></li>
     <li><a href="#navigate">Moving around the map</a></li>
     <li><a href="#grid">Grid &amp; calibration</a></li>
     <li><a href="#fog">Fog of war</a></li>
@@ -190,11 +191,23 @@
     <li><strong>Follow GM</strong> (the Player view controls in the View section): when on, the player screen mirrors your pan/zoom. Turn it off to frame the players' view independently with the zoom and position sliders.</li>
     <li><strong>Match GM view</strong> snaps the player view to your current framing once; <strong>Fit player view</strong> fits the whole map to the player screen.</li>
     <li>You can drag the red frame itself to pan the players' view without moving your own (see <a href="#rotate">Rotating &amp; the player frame</a>).</li>
+    <li><strong>Smooth fades</strong> (View section, on by default): on the player display, fog you reveal fades away instead of vanishing, and switching map or floor, or turning the splash or blackout screen on or off, fades through black. Untick it for instant changes.</li>
   </ul>
   <figure>
     <img src="manual/player-display.png" alt="Side by side: the GM window with a red dashed frame on the left, and the player window showing the matching framed view on the right.">
     <figcaption><b>Figure 3.</b> GM window (left) with the red player frame; the player window (right) shows exactly that region.</figcaption>
   </figure>
+</section>
+
+<section id="weather">
+  <h2 class="sec">Weather <a class="top" href="#about">↑ top</a></h2>
+  <p>The <strong>Weather</strong> section of the GM panel sets the mood on the player display: <strong>Rain</strong>, a <strong>Storm</strong> (heavier rain with lightning), <strong>Snow</strong>, drifting <strong>Fog</strong>, or rising <strong>Embers</strong> for fire and ruin. <strong>Intensity</strong> sets how heavy it is, and <strong>Wind</strong> which way it blows.</p>
+  <ul>
+    <li>It plays over the map on the player display, and is hidden while the splash or blackout screen is up.</li>
+    <li>You see a faint copy on your screen so it never gets in the way; untick <strong>Show it faintly on my screen too</strong> to hide it there.</li>
+    <li>During a storm, lightning flashes softly every several seconds; <strong>Lightning now</strong> calls one on cue. On a computer set to reduce motion there's no lightning.</li>
+    <li>The weather is saved with the map, so each location keeps its own.</li>
+  </ul>
 </section>
 
 <section id="navigate">
@@ -252,7 +265,7 @@
   <h3>Edit a selected token</h3>
   <p>When you select a token in Move mode, the token options open as <strong>Selected token</strong> and edit that token live: its colour, size, label, and image. Two extra fields appear:</p>
   <ul>
-    <li><strong>Notes (GM only)</strong> — hit points, conditions, secrets. Hover the token to see its note beside the cursor. Notes never reach the player display.</li>
+    <li><strong>Notes (GM only)</strong> — tactics, loot, secrets. Hover the token to see its note beside the cursor. Notes never reach the player display.</li>
     <li><strong>Hidden from players (stealth)</strong> — the token disappears from the player display entirely (it isn't even sent there) and shows translucent with a dashed ring on yours. Untick it when the rogue steps out of the shadows.</li>
   </ul>
   <p>All the edits you make to one selected token undo together with a single <kbd>Ctrl</kbd>+<kbd>Z</kbd>.</p>
@@ -260,6 +273,16 @@
     <img src="manual/token-editor.jpg" alt="A translucent, hidden bandit token selected on the map with its step arrows; a tooltip beside it shows its GM note, and the Selected token panel shows colour, size, label, the note and a ticked Hidden from players checkbox.">
     <figcaption><b>Figure 7.</b> Editing a selected token: a GM note (shown on hover) and hidden from the players.</figcaption>
   </figure>
+  <h3>Conditions</h3>
+  <p>A selected token's <strong>Conditions</strong> list tracks what's affecting it. Use the menu beside the heading to pick your game: <strong>D&amp;D 5e</strong> (blinded, charmed, exhaustion levels 1–6, prone…) or <strong>Pathfinder 2e</strong> (clumsy, frightened, off-guard, dying…). The choice applies to every token and is remembered. Pick a condition from <strong>+ Add a condition…</strong> and it appears as a small coloured badge with a short code (Pr for prone) around the token's edge, on your screen and the players'.</p>
+  <ul>
+    <li>Conditions with a value (exhaustion, or PF2e's frightened, drained, dying…) have <strong>− / +</strong> buttons; the number shows in the badge's corner. Lowering it below 1 removes the condition.</li>
+    <li>Type a number of <strong>rounds</strong> and it counts down with the initiative tracker's rounds, then drops off by itself. Leave it empty to keep it until you remove it.</li>
+    <li><strong>GM</strong> makes a condition GM-only: it shows with a dashed ring on your screen and is never sent to the players (a secret curse, a hidden charm).</li>
+    <li>Hover a token to see its conditions spelled out. Linked characters also show them in the initiative panel and the turn-order overlay.</li>
+  </ul>
+  <h3>Saved rolls</h3>
+  <p>Under <strong>Rolls</strong>, save the dice a creature uses — a name and the dice, like <em>Scimitar</em> and <code>1d20+4</code>. Click one to roll it with your dice style; the result is labelled with the token's name ("Goblin · Scimitar"). While the token is selected, its rolls also appear at the top of the <a href="#dice">dice tray</a>. Saved rolls are for you only and never reach the player display.</p>
 </section>
 
 <section id="images">
@@ -322,6 +345,12 @@
 <section id="initiative">
   <h2 class="sec">Initiative tracker <a class="top" href="#about">↑ top</a></h2>
   <p>Open the initiative tracker from its toolbar button (the numbered-list icon) or the retract tab on the right edge of the map. Add players, NPCs, and monsters with an initiative score and HP. Advance turns and rounds with the arrows, track damage and healing with the HP bars, and click a name to set the current turn.</p>
+  <h3>Let Lodestar roll for the monsters</h3>
+  <ul>
+    <li>In <strong>Init</strong>, type a modifier like <code>+2</code> or <code>-1</code> (or a roll like <code>d20+2</code>) instead of a number: Lodestar rolls it as the creature is added and remembers it.</li>
+    <li>In <strong>HP</strong>, type hit dice like <code>2d8+2</code> to roll the creature's hit points.</li>
+    <li>The lime <strong>d20</strong> in the round bar, <strong>Roll initiative</strong>, rolls again for everyone added with a modifier — as one throw of dice only you see — and re-sorts the order. The banner lists each result. At the start of a fight the order starts from the top; mid-fight, the current turn stays put.</li>
+  </ul>
   <p>A compact <strong>order overlay</strong> can sit in the corner of the screen:</p>
   <ul>
     <li>The <strong>GM</strong> toggle shows it on your screen; the <strong>Players</strong> toggle mirrors it to the player display.</li>

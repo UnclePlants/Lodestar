@@ -59,6 +59,8 @@ Prefer to run it offline? [Download the latest release](https://github.com/Uncle
 - **Multiple floors**: each floor has its own map, fog and tokens, linked by GM-only stairs.
 - **Rotate** the map in 90° steps, or rotate just the player display so it reads the right way up from across the table.
 - **Splash screen and blackout** to show an image or a black screen between scenes.
+- **Weather** on the player display: rain, storms with lightning, snow, drifting fog, or rising embers, with intensity and wind, saved with each map.
+- **Smooth fades**: revealed fog fades away on the player display, and changing map or floor fades through black.
 
 ### Fog of war
 
@@ -72,7 +74,9 @@ Prefer to run it offline? [Download the latest release](https://github.com/Uncle
 
 - **Tokens** with labels, colours, sizes or your own images, snapping to the grid. Add a batch by picking several image files at once. Select a token to edit it, give it a GM-only note, or hide it from players entirely.
 - **Movement**: step a selected token with its pop-out arrows or the arrow keys; the path and distance are traced (5e alternating diagonals).
-- **Initiative tracker**: turn order, rounds, HP bars, damage and healing, and a **C** toggle for concentration. Link a row to a token for a turn ring and a GM-only HP bar. A compact order overlay can sit on your screen, the players', or both.
+- **Conditions** on tokens, for **D&D 5e** or **Pathfinder 2e** (switchable): coloured badges with values (Frightened 2, exhaustion 3), optional round timers that count down with the initiative, and GM-only conditions the players never see.
+- **Initiative tracker**: turn order, rounds, HP bars, damage and healing, and a **C** toggle for concentration. Add monsters with a modifier (`+2`) and hit dice (`2d8+2`) and Lodestar rolls them; **Roll initiative** re-rolls every monster in one throw. Link a row to a token for a turn ring and a GM-only HP bar. A compact order overlay can sit on your screen, the players', or both.
+- **Saved rolls** on tokens ("Scimitar 1d20+4"): one click rolls them, labelled with the creature's name.
 - **Areas of effect**: circle, square and cone templates in any colour and size, live on both screens. Click to pin one as a marker (Grease, Wall of Fire…) with an optional label.
 - **3D dice roller**: build a roll on the pad (click a die to add it, right-click to take one off, **Clear** to start again) or type it: `1d20+5`, `4d6dl1`, `2d20kh1`, `d%`. One click for advantage or disadvantage. The dice really tumble and settle; tick *Players see the roll* to throw the very same dice on the player display, or keep it a secret GM roll. Style your dice with a live preview: colour, number colour, size, finish (satin, matte, glossy, metal, glass), font, and a glow, trail or sparks, plus a gold burst on a natural 20.
 - **Measure** in feet or metres, and **ping** any spot with Alt+click.
@@ -128,6 +132,7 @@ Lodestar is plain HTML, CSS and JavaScript with **no build step and no dependenc
 | `index.html` | The GM and player UI, and the welcome screen |
 | `app.js` | Everything else: maps, fog, tokens, floors, sync between windows, the library |
 | `dice.js` | The dice roller: notation parser, rigid-body physics, and the 3D renderer |
+| `weather.js` | Rain, storms, snow, fog and embers, drawn on their own overlay |
 | `styles.css` | All styling |
 | `manual.html` | The user manual (images in `manual/`) |
 
