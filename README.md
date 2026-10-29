@@ -88,13 +88,15 @@ Prefer to run it offline? [Download the latest release](https://github.com/Uncle
 - **GM notes**: rich-text sticky notes on the map, never shown to players.
 - **PDF windows**: open character sheets, stat blocks or rules beside the map.
 - **Grid**: size, offset, colour and opacity. Drag a square over one cell of the map's printed grid to calibrate the grid, token snapping and the ruler in one go.
-- **Undo and redo**, a **map library** with export and import, and a built-in shortcut sheet (press `?`).
+- **Undo and redo**, a **map library** with export and import, **session autosave** with Resume, and a built-in shortcut sheet (press `?`).
 
 The [user manual](https://lodestarvtt.com/manual.html) walks through every tool, with pictures.
 
 ## Saving and backups
 
 Everything you save (the map, fog, tokens, floors, grid and view) is stored in your browser's own storage (IndexedDB) on your computer. Nothing is ever uploaded: the hosted site is just static files with no server behind it.
+
+Your session is also **autosaved** every few seconds as you play. If the tab closes or the browser crashes mid-session, the welcome screen offers **Resume** next time. Closing the tab with changes that aren't in your library asks first.
 
 That storage belongs to one browser, on one device, at one address. Maps saved on lodestarvtt.com won't appear in a downloaded copy, in another browser, on another computer, or in a private window, and clearing your browser's site data erases them.
 

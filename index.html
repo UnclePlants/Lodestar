@@ -61,6 +61,11 @@
             <span>Open Lodestar</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
           </button>
+          <!-- Shown when this browser autosaved a session last time (see "session autosave"). -->
+          <button id="startResume" class="start-btn start-btn-resume" type="button" hidden title="Pick up where you left off: the map, fog, tokens and initiative as they were">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.64-6.36L3 8.3"/><path d="M3 3v5.3h5.3"/></svg>
+            <span class="start-resume-label"><span>Resume</span><small id="startResumeMeta"></small></span>
+          </button>
         </div>
       </div>
       <!-- The demo, tucked in the bottom-right corner under a "Try it now" label whose doodled

@@ -192,8 +192,50 @@ button:hover {
 .start-actions {
   animation: start-rise 0.8s ease 1.3s both;
   display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   justify-content: center;
   margin-top: 14px;
+}
+
+.start-btn[hidden] {
+  display: none;
+}
+
+/* Beside the main button when there's an autosaved session: its map and when it was saved. */
+.start-btn-resume {
+  background: rgba(13, 9, 48, 0.78);
+  border: 1px solid rgba(195, 200, 214, 0.35);
+  color: var(--text);
+  min-width: 0;
+  padding: 0 22px;
+}
+
+.start-btn-resume:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.start-resume-label {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.start-resume-label small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  max-width: 230px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.start-resume-label small:empty {
+  display: none;
 }
 
 .start-btn {
