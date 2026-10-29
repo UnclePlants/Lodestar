@@ -9,6 +9,9 @@
  *
  * Supported shapes: d4 (read at the top corner), d6, d8, d10, d12, d20, and d100 (a tens d10
  * plus a units d10). Other sizes (d2, d3, d7…) roll without a 3D die.
+ *
+ * How the dice look (colour, number colour, size, finish, font, an effect, and a flash for
+ * natural 20s and 1s) travels with the roll as well; see normStyle.
  */
 (function () {
   "use strict";
@@ -285,28 +288,34 @@
 
   /* ---------------- physics ---------------- */
 
-  const TRAY_W = 8; // half-width of the tray (x), in die-sized units
-  const TRAY_H = 4.5; // half-height (y)
+  // The tray's half-width (x) and half-height (y) in die-sized units, at the normal dice size.
+  // Bigger dice are a smaller tray (fewer die-widths across the same screen), and vice versa.
+  const TRAY_W = 8;
+  const TRAY_H = 4.5;
   const GRAVITY = 52;
   const DT = 1 / 240;
   const STEPS_PER_FRAME = 4; // record at 60 fps
   const MAX_SECONDS = 4.5; // anything still rocking by then is eased flat by the settle step
-  const PLANES = [
-    { n: v3(0, 0, 1), d: 0, e: 0.3, mu: 0.5, floor: true },
-    { n: v3(1, 0, 0), d: -TRAY_W, e: 0.5, mu: 0.2 },
-    { n: v3(-1, 0, 0), d: -TRAY_W, e: 0.5, mu: 0.2 },
-    { n: v3(0, 1, 0), d: -TRAY_H, e: 0.5, mu: 0.2 },
-    { n: v3(0, -1, 0), d: -TRAY_H, e: 0.5, mu: 0.2 },
-  ];
+
+  // The table and the tray's four walls.
+  function planesFor(tray) {
+    return [
+      { n: v3(0, 0, 1), d: 0, e: 0.3, mu: 0.5, floor: true },
+      { n: v3(1, 0, 0), d: -tray.w, e: 0.5, mu: 0.2 },
+      { n: v3(-1, 0, 0), d: -tray.w, e: 0.5, mu: 0.2 },
+      { n: v3(0, 1, 0), d: -tray.h, e: 0.5, mu: 0.2 },
+      { n: v3(0, -1, 0), d: -tray.h, e: 0.5, mu: 0.2 },
+    ];
+  }
 
   function applyImpulse(b, r, J) {
     b.v = add(b.v, J);
     b.w = add(b.w, mul(cross(r, J), 1 / b.kind.inertia));
   }
 
-  function collidePlanes(b, t, impacts) {
+  function collidePlanes(b, t, impacts, planes) {
     b.onFloor = false;
-    for (const P of PLANES) {
+    for (const P of planes) {
       let deepest = 0;
       const contacts = [];
       for (const vb of b.kind.verts) {
@@ -403,7 +412,7 @@
   }
 
   // The face the die is lying on, and the rotation that sets it exactly flat.
-  function restPose(b) {
+  function restPose(b, tray) {
     let bottom = b.kind.faces[0];
     let lowest = Infinity;
     b.kind.faces.forEach((f) => {
@@ -415,7 +424,7 @@
     });
     const q = qnorm(qmul(qFromTo(qrot(b.q, bottom.normal), v3(0, 0, -1)), b.q));
     const minZ = Math.min(...b.kind.verts.map((p) => qrot(q, p).z));
-    const x = v3(clamp(b.x.x, -TRAY_W + 0.5, TRAY_W - 0.5), clamp(b.x.y, -TRAY_H + 0.5, TRAY_H - 0.5), -minZ);
+    const x = v3(clamp(b.x.x, -tray.w + 0.5, tray.w - 0.5), clamp(b.x.y, -tray.h + 0.5, tray.h - 0.5), -minZ);
     return { x, q };
   }
 
@@ -437,19 +446,20 @@
 
   // Throw the dice and record the whole tumble. Returns per-die flat frame arrays
   // ([x, y, z, qw, qx, qy, qz] per frame), the values rolled, and impact times for sound.
-  function simulate(sidesList) {
+  function simulate(sidesList, tray = { w: TRAY_W, h: TRAY_H }) {
     const n = sidesList.length;
     if (!n) return { frames: [], values: [], impacts: [] };
+    const planes = planesFor(tray);
     const dir = rand() < 0.5 ? 1 : -1; // thrown from the left or the right edge
     const cols = Math.min(4, Math.ceil(Math.sqrt(n)));
     const rows = Math.ceil(n / cols);
     const bodies = sidesList.map((sides, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      const y = clamp((row - (rows - 1) / 2) * 1.6 + randRange(-0.4, 0.4), -TRAY_H + 1, TRAY_H - 1);
+      const y = clamp((row - (rows - 1) / 2) * 1.6 + randRange(-0.4, 0.4), -tray.h + 1, tray.h - 1);
       return {
         kind: getKind(sides),
-        x: v3(-dir * (TRAY_W - 1.1 - col * 1.5), y, randRange(2.2, 3.8)),
+        x: v3(-dir * (tray.w - 1.1 - col * 1.5), y, randRange(2.2, 3.8)),
         v: v3(dir * randRange(10, 16), randRange(-3, 3) - y * 0.5, randRange(0, 2.5)),
         w: mul(randUnit(), randRange(14, 26)),
         q: randQuat(),
@@ -472,7 +482,7 @@
       bodies.forEach((b) => {
         if (b.asleep) return;
         step(b);
-        collidePlanes(b, t, impacts);
+        collidePlanes(b, t, impacts, planes);
       });
       collideBodies(bodies, t, impacts);
       // A die is at rest once it has barely moved or turned for a while. (Its instantaneous
@@ -495,7 +505,7 @@
       if (bodies.every((b) => b.asleep)) break;
     }
     // Ease every die onto the face it's resting on, so each one ends perfectly flat.
-    const finals = bodies.map(restPose);
+    const finals = bodies.map((b) => restPose(b, tray));
     const SETTLE = 9;
     for (let k = 1; k <= SETTLE; k++) {
       const e = 1 - Math.pow(1 - k / SETTLE, 2);
@@ -507,12 +517,60 @@
     return { frames, values: bodies.map((b, i) => readValue(b.kind, finals[i].q)), impacts };
   }
 
+  /* ---------------- looks ---------------- */
+
+  // How the dice look, chosen in the GM's dice tray and sent along with each roll so the player
+  // display draws the very same dice. normStyle() keeps only known values (anything else falls
+  // back to the default), so a roll's style can't smuggle in arbitrary fonts or colours.
+  // Fonts are ones Windows and macOS already have, so nothing is downloaded: [stack, weight].
+  const FONTS = {
+    sans: ["Inter, system-ui, sans-serif", 700],
+    serif: ["Georgia, 'Times New Roman', serif", 700],
+    garamond: ["Garamond, 'EB Garamond', 'Adobe Garamond Pro', Georgia, serif", 700],
+    impact: ["Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif", 400],
+    script: ["'Segoe Script', 'Brush Script MT', 'Snell Roundhand', cursive", 700],
+    papyrus: ["Papyrus, fantasy", 700],
+    mono: ["Consolas, ui-monospace, 'Courier New', monospace", 700],
+  };
+  // How a face is lit: amb + dif × light, plus a highlight of strength `spec` (tighter as `pow`
+  // grows). Metal highlights take the die's own colour; glass lets the far faces show through.
+  const FINISHES = {
+    satin: { amb: 0.36, dif: 0.64, spec: 0.32, pow: 28, edge: "rgba(0,0,0,0.3)" },
+    matte: { amb: 0.44, dif: 0.56, spec: 0.05, pow: 8, edge: "rgba(0,0,0,0.22)" },
+    glossy: { amb: 0.3, dif: 0.7, spec: 0.8, pow: 60, edge: "rgba(255,255,255,0.24)" },
+    metal: { amb: 0.2, dif: 0.55, spec: 1.1, pow: 10, metal: true, edge: "rgba(0,0,0,0.5)" },
+    glass: { amb: 0.45, dif: 0.45, spec: 0.9, pow: 50, glass: true, edge: "rgba(255,255,255,0.5)" },
+  };
+  const EFFECTS = ["none", "glow", "trail", "sparkles"];
+  const DEFAULT_STYLE = { color: "#8c1c2c", ink: "", size: 1, font: "sans", finish: "satin", effect: "none", crits: true };
+  const own = (o, k) => typeof k === "string" && Object.prototype.hasOwnProperty.call(o, k);
+
+  // A complete, safe style from whatever was given. ink "" means automatic (light on dark dice,
+  // dark on light ones); size scales the dice, 0.6–1.5.
+  function normStyle(s) {
+    const o = s && typeof s === "object" ? s : {};
+    const hex = (v) => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : "");
+    return {
+      color: hex(o.color) || DEFAULT_STYLE.color,
+      ink: hex(o.ink),
+      size: clamp(Number(o.size) || 1, 0.6, 1.5),
+      font: own(FONTS, o.font) ? o.font : DEFAULT_STYLE.font,
+      finish: own(FINISHES, o.finish) ? o.finish : DEFAULT_STYLE.finish,
+      effect: EFFECTS.includes(o.effect) ? o.effect : DEFAULT_STYLE.effect,
+      crits: o.crits !== false,
+    };
+  }
+
   /* ---------------- a roll ---------------- */
 
   // Parse, throw and total a roll. The result is plain JSON: safe to send to the player.
+  // opts.style: how the dice look (see normStyle; opts.color alone still works).
   function createRoll(expr, opts = {}) {
     const terms = parse(expr);
-    const color = opts.color || "#8c1c2c";
+    const style = normStyle(opts.style || { color: opts.color });
+    const tray = { w: TRAY_W / style.size, h: TRAY_H / style.size };
+    // Bigger dice leave less room, so fewer fit in one throw.
+    const maxPhysical = Math.round(clamp(MAX_PHYSICAL / (style.size * style.size), 12, MAX_PHYSICAL));
     const phys = []; // { sides, labels } for every 3D die in the throw
     const plan = terms.map((t) => {
       if (t.type !== "dice") return null;
@@ -526,8 +584,14 @@
         return { value: 1 + randInt(t.sides) }; // no 3D shape for this size
       });
     });
-    if (phys.length > MAX_PHYSICAL) throw new Error(`That's too many dice to throw at once (max ${MAX_PHYSICAL}).`);
-    const sim = simulate(phys.map((p) => p.sides));
+    if (phys.length > maxPhysical) {
+      throw new Error(
+        maxPhysical < MAX_PHYSICAL
+          ? `That's too many dice to throw at once at this dice size (max ${maxPhysical}). Smaller dice fit more.`
+          : `That's too many dice to throw at once (max ${MAX_PHYSICAL}).`
+      );
+    }
+    const sim = simulate(phys.map((p) => p.sides), tray);
 
     let total = 0;
     const outTerms = terms.map((t, ti) => {
@@ -563,7 +627,9 @@
       terms: outTerms,
       frameRate: 60,
       impacts: sim.impacts,
-      dice: phys.map((p, i) => ({ sides: p.sides, labels: p.labels, color, dropped: !!p.dropped, frames: sim.frames[i] })),
+      style,
+      tray,
+      dice: phys.map((p, i) => ({ sides: p.sides, labels: p.labels, color: style.color, dropped: !!p.dropped, frames: sim.frames[i] })),
     };
   }
 
@@ -575,26 +641,88 @@
   const HALF = norm(add(LIGHT, v3(0, 0, 1)));
   const HOLD_MS = 4200; // how long settled dice stay up before fading
   const FADE_MS = 700;
+  const CRIT_MS = 1400; // a natural 20's (or 1's) burst
+  const TRAIL = 10; // poses sampled along a trail
+  const SPARK_FRAMES = 40; // how long a bounce's sparks fly, in recorded frames
 
   function hexToRgb(hex) {
     const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
     const n = m ? parseInt(m[1], 16) : 0x8c1c2c;
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
+  const mix = (rgb, to, k) => rgb.map((c, i) => Math.round(c + (to[i] - c) * k));
+  const rgba = (rgb, a) => `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
+  const luma = (rgb) => (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+  // The numbers' colour: the chosen one, or light on dark dice and dark on light ones.
+  const inkOf = (st) => st.ink || (luma(hexToRgb(st.color)) > 0.6 ? "#1b1b1b" : "#f6eed8");
+  // Glow, trail and spark colour: the dice colour lifted, or the ink on very dark dice.
+  const effectRgb = (st) => {
+    const base = hexToRgb(st.color);
+    return luma(base) < 0.22 ? hexToRgb(inkOf(st)) : mix(base, [255, 255, 255], 0.3);
+  };
+  // Repeatable pseudo-randomness for the effects, so a spark looks the same frame to frame.
+  const hash = (n) => {
+    const s = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
+    return s - Math.floor(s);
+  };
+  const qAxis = (axis, angle) => {
+    const a = norm(axis);
+    const s = Math.sin(angle / 2);
+    return [Math.cos(angle / 2), a.x * s, a.y * s, a.z * s];
+  };
 
   function labelText(value, labels) {
     if (labels === "tens") return value === 0 ? "00" : String(value * 10);
     return String(value);
   }
 
-  // The overlay that plays rolls back. One per window (GM and player).
+  // Where a die bounced (frame and spot on the table), worked out once from its recorded tumble:
+  // the low points of its height where it came down fast enough.
+  const bounceCache = new WeakMap();
+  function bouncesOf(die) {
+    if (bounceCache.has(die)) return bounceCache.get(die);
+    const fr = die.frames;
+    const count = fr.length / 7;
+    const out = [];
+    for (let i = 1; i < count - 1; i++) {
+      const z0 = fr[(i - 1) * 7 + 2];
+      const z = fr[i * 7 + 2];
+      const z1 = fr[(i + 1) * 7 + 2];
+      const speed = (z0 - z) * 60;
+      if (z1 >= z && speed > 2.5) out.push({ f: i, x: fr[i * 7], y: fr[i * 7 + 1], s: Math.min(1, speed / 14) });
+    }
+    bounceCache.set(die, out);
+    return out;
+  }
+
+  // What each d20 shows once the roll settles, for the crit flash: "high" (a natural 20),
+  // "low" (a natural 1) or null. Dropped dice (the other die of advantage) don't count.
+  const critCache = new WeakMap();
+  function critsOf(roll) {
+    if (!critCache.has(roll)) {
+      critCache.set(
+        roll,
+        roll.dice.map((die) => {
+          if (die.sides !== 20 || die.labels !== "std" || die.dropped) return null;
+          const i = die.frames.length - 7;
+          const v = readValue(getKind(20), die.frames.slice(i + 3, i + 7));
+          return v === 20 ? "high" : v === 1 ? "low" : null;
+        })
+      );
+    }
+    return critCache.get(roll);
+  }
+
+  // The overlay that plays rolls back (one per window: GM and player), or the dice tray's
+  // style preview.
   function createStage(canvas) {
     const ctx = canvas.getContext("2d");
     let current = null;
     let audioCtx = null;
     let noiseBuf = null;
 
-    function layout() {
+    // Fit the tray (plus a margin, in die units) into the canvas.
+    function layout(tray, margin = 1.2) {
       const rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
       const w = Math.max(1, Math.round(rect.width * dpr));
@@ -603,8 +731,7 @@
         canvas.width = w;
         canvas.height = h;
       }
-      // Fit the tray (plus a margin) into the overlay.
-      const scale = Math.min(rect.width / (TRAY_W * 2 + 1.2), rect.height / (TRAY_H * 2 + 1.2));
+      const scale = Math.min(rect.width / (tray.w * 2 + margin), rect.height / (tray.h * 2 + margin));
       return { dpr, w: rect.width, h: rect.height, cx: rect.width / 2, cy: rect.height / 2, scale };
     }
 
@@ -647,77 +774,254 @@
       if (underline) ctx.fillRect(-F * 0.24, F * 0.44, F * 0.48, F * 0.08);
     }
 
-    function drawDie(die, pose, L, alpha) {
+    // A four-point star: sparks.
+    function sparkle(x, y, outer, inner, angle) {
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const r = i % 2 ? inner : outer;
+        const a = angle + (i * Math.PI) / 4;
+        if (i) ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+        else ctx.moveTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawDie(die, pose, L, alpha, st) {
       const kind = getKind(die.sides);
-      const base = hexToRgb(die.color);
-      const lum = (0.299 * base[0] + 0.587 * base[1] + 0.114 * base[2]) / 255;
-      const ink = lum > 0.6 ? "#1b1b1b" : "#f6eed8";
-      const world = kind.verts.map((p) => add(pose.x, qrot(pose.q, p)));
-      const scr = world.map((p) => project(p, L));
-      ctx.font = "700 64px Inter, system-ui, sans-serif";
+      const fin = FINISHES[st.finish];
+      const base = hexToRgb(st.color);
+      const ink = inkOf(st);
+      const hi = fin.metal ? mix(base, [255, 255, 255], 0.35) : [255, 255, 255]; // highlight colour
+      const scr = kind.verts.map((p) => project(add(pose.x, qrot(pose.q, p)), L));
+      const [family, weight] = FONTS[st.font];
+      ctx.font = `${weight} 64px ${family}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      kind.faces.forEach((face) => {
+      const faces = kind.faces.map((face) => {
         const nW = qrot(pose.q, face.normal);
         const cW = add(pose.x, qrot(pose.q, face.center));
-        const facing = dot(nW, norm(sub(CAM, cW)));
-        if (facing <= 0) return; // back face of a convex solid
+        return { face, nW, cW, facing: dot(nW, norm(sub(CAM, cW))) };
+      });
+      const fill = ({ face, nW }, a, dim) => {
         const lam = Math.max(0, dot(nW, LIGHT));
-        const spec = Math.pow(Math.max(0, dot(nW, HALF)), 28) * 0.32;
-        const shade = 0.36 + 0.64 * lam;
-        const rgb = base.map((c) => Math.min(255, Math.round(c * shade + 255 * spec)));
+        const spec = Math.pow(Math.max(0, dot(nW, HALF)), fin.pow) * fin.spec;
+        const shade = (fin.amb + fin.dif * lam) * dim;
+        const rgb = base.map((c, i) => Math.min(255, Math.round(c * shade + hi[i] * spec)));
         ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
-        ctx.globalAlpha = alpha;
+        ctx.globalAlpha = a;
         ctx.beginPath();
         face.idx.forEach((vi, i) => (i ? ctx.lineTo(scr[vi].x, scr[vi].y) : ctx.moveTo(scr[vi].x, scr[vi].y)));
         ctx.closePath();
         ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
         ctx.fill();
         ctx.lineWidth = 1;
-        ctx.strokeStyle = "rgba(0,0,0,0.3)";
+        ctx.strokeStyle = fin.edge;
         ctx.stroke();
-        const textAlpha = alpha * clamp((facing - 0.12) / 0.3, 0, 1) * (0.55 + 0.45 * shade);
+        return shade;
+      };
+      // Glass: the far side shows through, faintly, behind the near faces.
+      if (fin.glass) faces.filter((f) => f.facing <= 0).forEach((f) => fill(f, alpha * 0.3, 0.6));
+      faces.forEach((f) => {
+        if (f.facing <= 0) return; // back face of a convex solid
+        const shade = fill(f, alpha * (fin.glass ? 0.5 : 1), 1);
+        const textAlpha = alpha * clamp((f.facing - 0.12) / 0.3, 0, 1) * (0.55 + 0.45 * Math.min(1, shade));
         if (textAlpha <= 0.02) return;
         if (kind.vertexLabels) {
-          face.idx.forEach((vi) => {
+          f.face.idx.forEach((vi) => {
             const vp = kind.verts[vi];
-            const at = add(pose.x, qrot(pose.q, add(face.center, mul(sub(vp, face.center), 0.52))));
-            const up = qrot(pose.q, norm(sub(vp, face.center)));
-            drawText(String(kind.vertexLabels[vi]), at, up, nW, face.inner * 0.62, L, ink, textAlpha, false);
+            const at = add(pose.x, qrot(pose.q, add(f.face.center, mul(sub(vp, f.face.center), 0.52))));
+            const up = qrot(pose.q, norm(sub(vp, f.face.center)));
+            drawText(String(kind.vertexLabels[vi]), at, up, f.nW, f.face.inner * 0.62, L, ink, textAlpha, false);
           });
         } else {
-          const text = labelText(face.value, die.labels);
-          const size = face.textSize * (text.length > 1 ? 0.78 : 1);
+          const text = labelText(f.face.value, die.labels);
+          const size = f.face.textSize * (text.length > 1 ? 0.78 : 1);
           const underline = (text === "6" || text === "9") && kind.sides >= 10;
-          drawText(text, cW, qrot(pose.q, face.up), nW, size, L, ink, textAlpha, underline);
+          drawText(text, f.cW, qrot(pose.q, f.face.up), f.nW, size, L, ink, textAlpha, underline);
         }
       });
     }
 
-    function draw(roll, f, alpha, dropFade) {
-      const L = layout();
+    // A soft contact shadow, fading as the die rises (lighter under glass).
+    function drawShadow(die, pose, L, alpha, st) {
+      const kind = getKind(die.sides);
+      const c = project(v3(pose.x.x + pose.x.z * 0.12, pose.x.y - pose.x.z * 0.12, 0), L);
+      const r = kind.circ * L.scale * (1.05 + pose.x.z * 0.1);
+      const g = ctx.createRadialGradient(c.x, c.y, r * 0.2, c.x, c.y, r);
+      const a = (FINISHES[st.finish].glass ? 0.22 : 0.42) * clamp(1 - pose.x.z / 7, 0, 1) * alpha;
+      g.addColorStop(0, `rgba(0,0,0,${a})`);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = g;
+      ctx.fillRect(c.x - r, c.y - r, r * 2, r * 2);
+    }
+
+    // Glow: a soft halo around the die.
+    function drawGlow(pose, kind, L, alpha, rgb) {
+      const c = project(pose.x, L);
+      const r = kind.circ * L.scale * 2.1;
+      const g = ctx.createRadialGradient(c.x, c.y, r * 0.15, c.x, c.y, r);
+      g.addColorStop(0, rgba(rgb, 0.7 * alpha));
+      g.addColorStop(1, rgba(rgb, 0));
+      ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
+      ctx.globalCompositeOperation = "screen";
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = g;
+      ctx.fillRect(c.x - r, c.y - r, r * 2, r * 2);
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    // Trail: a fading, tapering streak along the die's recent path (newest point first).
+    function drawTrail(path, kind, L, alpha, rgb) {
+      const pts = path.map((p) => project(p, L));
+      const w0 = kind.circ * L.scale * 1.1;
+      ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
+      ctx.lineCap = "round";
+      ctx.strokeStyle = rgba(rgb, 1);
+      for (let i = 1; i < pts.length; i++) {
+        if (Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) < 0.5) continue;
+        const k = 1 - i / pts.length;
+        ctx.globalAlpha = 0.5 * k * alpha;
+        ctx.lineWidth = Math.max(1, w0 * k);
+        ctx.beginPath();
+        ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+        ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.stroke();
+      }
+    }
+
+    // Sparks: a burst of little stars where a die bounced. sparks: [{ x, y, s, age 0–1, seed }].
+    function drawSparks(sparks, L, alpha, rgb) {
+      ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
+      ctx.globalCompositeOperation = "screen";
+      const tint = rgba(mix(rgb, [255, 244, 190], 0.5), 1);
+      sparks.forEach((sp) => {
+        const n = 8 + Math.round(sp.s * 10);
+        const out = 1 - Math.pow(1 - sp.age, 3);
+        for (let k = 0; k < n; k++) {
+          const a = hash(sp.seed + k * 7.31) * Math.PI * 2;
+          const dist = (0.5 + hash(sp.seed + k * 3.17) * 1.4) * (0.8 + sp.s) * out;
+          const p = project(v3(sp.x + Math.cos(a) * dist, sp.y + Math.sin(a) * dist, 0.3 + 0.8 * out), L);
+          const size = L.scale * 0.26 * (1 - sp.age * 0.7) * (0.6 + hash(sp.seed + k) * 0.8);
+          ctx.globalAlpha = alpha * (1 - sp.age);
+          ctx.fillStyle = k % 3 ? tint : "#ffffff";
+          sparkle(p.x, p.y, size, size * 0.28, a);
+        }
+      });
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    // A natural 20 glows gold and bursts with rays; a natural 1 glows red with a single ring.
+    // age: 0 → 1 over the burst; the glow stays while the dice are up.
+    function drawCrit(pose, kind, L, alpha, high, age) {
+      const c = project(pose.x, L);
+      const r0 = kind.circ * L.scale;
+      const col = high ? [255, 214, 92] : [222, 44, 44];
+      ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
+      ctx.globalCompositeOperation = high ? "screen" : "source-over";
+      const R = r0 * 2.4;
+      const g = ctx.createRadialGradient(c.x, c.y, r0 * 0.3, c.x, c.y, R);
+      g.addColorStop(0, rgba(col, (high ? 0.6 : 0.45) * alpha * Math.min(1, age * 4)));
+      g.addColorStop(1, rgba(col, 0));
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = g;
+      ctx.fillRect(c.x - R, c.y - R, R * 2, R * 2);
+      if (age < 1) {
+        const e = 1 - Math.pow(1 - age, 3);
+        ctx.globalAlpha = alpha * (1 - age);
+        ctx.strokeStyle = rgba(col, 1);
+        ctx.lineWidth = Math.max(1.5, r0 * 0.12 * (1 - age));
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, r0 * (1.1 + 2.4 * e), 0, Math.PI * 2);
+        ctx.stroke();
+        if (high) {
+          ctx.lineWidth = Math.max(1, r0 * 0.07 * (1 - age));
+          ctx.lineCap = "round";
+          for (let k = 0; k < 12; k++) {
+            const a = (k / 12) * Math.PI * 2 + age * 0.6;
+            const r1 = r0 * (1.2 + 1.2 * e);
+            const r2 = r0 * (1.6 + 2.6 * e);
+            ctx.beginPath();
+            ctx.moveTo(c.x + Math.cos(a) * r1, c.y + Math.sin(a) * r1);
+            ctx.lineTo(c.x + Math.cos(a) * r2, c.y + Math.sin(a) * r2);
+            ctx.stroke();
+          }
+        }
+      }
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    // One frame: shadows, then what goes under the dice (trail, glow, crit glow), the dice from
+    // lowest to highest, and sparks on top. items: { die, pose, alpha, trail?: [world points,
+    // newest first], sparks?: [...], crit?: { high, age } }.
+    function drawScene(items, L, st) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const items = roll.dice.map((die) => ({ die, pose: poseAt(die, f) }));
-      // Soft contact shadows first, fading as a die rises.
-      ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
-      items.forEach(({ die, pose }) => {
-        const kind = getKind(die.sides);
-        const c = project(v3(pose.x.x + pose.x.z * 0.12, pose.x.y - pose.x.z * 0.12, 0), L);
-        const r = kind.circ * L.scale * (1.05 + pose.x.z * 0.1);
-        const g = ctx.createRadialGradient(c.x, c.y, r * 0.2, c.x, c.y, r);
-        const a = 0.42 * clamp(1 - pose.x.z / 7, 0, 1) * alpha;
-        g.addColorStop(0, `rgba(0,0,0,${a})`);
-        g.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = g;
-        ctx.fillRect(c.x - r, c.y - r, r * 2, r * 2);
+      const fx = effectRgb(st);
+      items.forEach((it) => drawShadow(it.die, it.pose, L, it.alpha, st));
+      items.forEach((it) => {
+        const kind = getKind(it.die.sides);
+        if (it.trail) drawTrail(it.trail, kind, L, it.alpha, fx);
+        if (st.effect === "glow") drawGlow(it.pose, kind, L, it.alpha, fx);
+        if (it.crit) drawCrit(it.pose, kind, L, it.alpha, it.crit.high, it.crit.age);
       });
       items
+        .slice()
         .sort((a, b) => a.pose.x.z - b.pose.x.z)
-        .forEach(({ die, pose }) => drawDie(die, pose, L, alpha * (die.dropped ? 1 - 0.62 * dropFade : 1)));
+        .forEach((it) => drawDie(it.die, it.pose, L, it.alpha, st));
+      items.forEach((it) => it.sparks && drawSparks(it.sparks, L, it.alpha, fx));
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = 1;
+    }
+
+    // A frame of a roll. after: ms since the dice settled (negative while they're tumbling).
+    function draw(roll, f, alpha, dropFade, after) {
+      const st = normStyle(roll.style || { color: roll.dice[0]?.color });
+      const L = layout(roll.tray || { w: TRAY_W, h: TRAY_H });
+      const crits = st.crits && after >= 0 ? critsOf(roll) : [];
+      const items = roll.dice.map((die, i) => {
+        const it = { die, pose: poseAt(die, f), alpha: alpha * (die.dropped ? 1 - 0.62 * dropFade : 1) };
+        if (st.effect === "trail") it.trail = Array.from({ length: TRAIL }, (_, k) => poseAt(die, f - k * 1.5).x);
+        if (st.effect === "sparkles") {
+          it.sparks = bouncesOf(die)
+            .filter((b) => f >= b.f && f - b.f < SPARK_FRAMES)
+            .map((b) => ({ x: b.x, y: b.y, s: b.s, age: (f - b.f) / SPARK_FRAMES, seed: i * 101 + b.f }));
+        }
+        if (crits[i]) it.crit = { high: crits[i] === "high", age: after / CRIT_MS };
+        return it;
+      });
+      drawScene(items, L, st);
+    }
+
+    // The dice tray's style preview: a d6, a d20 and a d10 turning slowly in the given style,
+    // drifting in small circles, with a spark burst now and then. With a trail they sweep side
+    // to side together instead, far enough for the trail to show past them. t: ms.
+    function preview(style, t) {
+      canvas.hidden = false;
+      const st = normStyle(style);
+      const k = 0.8 + 0.2 * st.size; // bigger dice look a little bigger here too
+      const L = layout({ w: 2.95 / k, h: 0.92 / k }, 0.3);
+      const s = t / 1000;
+      const trail = st.effect === "trail";
+      const items = [6, 20, 10].map((sides, i) => {
+        const kind = getKind(sides);
+        const at = (u) =>
+          trail
+            ? v3((i - 1) * 1.95 + 0.85 * Math.sin(1.8 * u), 0.12 * Math.sin(3.6 * u), kind.circ * 1.15)
+            : v3((i - 1) * 1.95 + 0.12 * Math.cos(1.4 * u + i * 2.1), 0.07 * Math.sin(1.4 * u + i * 2.1), kind.circ * 1.15);
+        const q = qmul(qAxis(v3(0.35, 1, 0.25 * (i - 1)), s * 0.7 + i * 1.9), qAxis(v3(1, 0, 0), 0.6 + i));
+        const it = { die: { sides, labels: "std" }, pose: { x: at(s), q }, alpha: 1 };
+        if (trail) it.trail = Array.from({ length: TRAIL }, (_, n) => at(s - n * 0.1));
+        if (st.effect === "sparkles") {
+          const cycle = (s + i * 0.53) / 1.6;
+          const age = ((cycle - Math.floor(cycle)) * 1.6) / 0.66;
+          if (age < 1) it.sparks = [{ x: it.pose.x.x, y: it.pose.x.y, s: 0.6, age, seed: i * 101 + Math.floor(cycle) }];
+        }
+        return it;
+      });
+      drawScene(items, L, st);
     }
 
     function ensureAudio() {
@@ -788,7 +1092,7 @@
         }
         const after = ms - simMs;
         const alpha = after > HOLD_MS ? clamp(1 - (after - HOLD_MS) / FADE_MS, 0, 1) : 1;
-        if (frameCount) draw(roll, (ms / 1000) * roll.frameRate, alpha, cur.settled ? clamp(after / 400, 0, 1) : 0);
+        if (frameCount) draw(roll, (ms / 1000) * roll.frameRate, alpha, cur.settled ? clamp(after / 400, 0, 1) : 0, cur.settled ? after : -1);
         if (alpha <= 0) {
           current = null;
           ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -803,8 +1107,8 @@
     }
 
     canvas.hidden = true;
-    return { play, stop, isPlaying: () => !!current };
+    return { play, stop, preview, isPlaying: () => !!current };
   }
 
-  window.LodestarDice = { parse, format, createRoll, createStage, PHYSICAL };
+  window.LodestarDice = { parse, format, createRoll, createStage, normStyle, inkOf, DEFAULT_STYLE, PHYSICAL };
 })();

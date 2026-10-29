@@ -3302,18 +3302,147 @@ input:disabled {
   gap: 6px 12px;
 }
 
-.dice-color {
-  margin-left: auto;
+/* Dice style: a collapsible section with a live preview, ready-made looks, and the settings. */
+.dice-style {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
 }
 
-.dice-color input {
+.dice-style summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  font-size: 0.85rem;
+  font-weight: 600;
+  gap: 8px;
+  list-style: none;
+}
+
+.dice-style summary::-webkit-details-marker {
+  display: none;
+}
+
+.dice-style summary::after {
+  color: var(--muted);
+  content: "▸";
+  margin-left: auto;
+  transition: transform 0.15s ease;
+}
+
+.dice-style[open] summary::after {
+  transform: rotate(90deg);
+}
+
+.dice-style[open] {
+  gap: 10px;
+}
+
+/* The summary's swatch shows the current dice colour (set from app.js). */
+.dice-style-swatch {
+  background: var(--dice-swatch, #8c1c2c);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  height: 14px;
+  transform: rotate(45deg) scale(0.85);
+  width: 14px;
+}
+
+.dice-preview {
+  background: radial-gradient(ellipse at 50% 40%, #2a2f3d, #141722 75%);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: block;
+  height: 92px;
+  width: 100%;
+}
+
+.dice-presets {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.dice-presets button {
+  font-size: 0.78rem;
+  min-height: 28px;
+  padding: 0 4px;
+}
+
+.dice-presets button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dice-style-grid {
+  align-items: center;
+  display: grid;
+  font-size: 0.82rem;
+  gap: 7px 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.dice-style-grid label {
+  color: var(--muted);
+}
+
+.dice-style-grid select {
+  min-height: 30px;
+  min-width: 0;
+  width: 100%;
+}
+
+.dice-style input[type="color"] {
   background: none;
   border: 1px solid var(--line);
   border-radius: 6px;
   cursor: pointer;
-  height: 26px;
+  height: 28px;
   padding: 1px;
-  width: 34px;
+  width: 44px;
+}
+
+.dice-ink,
+.dice-size {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.dice-ink button {
+  font-size: 0.76rem;
+  min-height: 26px;
+  padding: 0 10px;
+}
+
+.dice-ink button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dice-size input {
+  flex: 1;
+  min-width: 0;
+}
+
+.dice-size output {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2em;
+  text-align: right;
+}
+
+.dice-style .checkbox-row {
+  font-size: 0.82rem;
+}
+
+.dice-style-reset {
+  color: var(--muted);
+  font-size: 0.78rem;
+  justify-self: start;
+  min-height: 26px;
+  padding: 0 10px;
 }
 
 .dice-history {
