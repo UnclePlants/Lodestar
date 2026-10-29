@@ -203,17 +203,6 @@
           <p class="hint">Add images, notes and PDFs from the map toolbar. Drag an image onto the map to drop it. In Move mode, click an image to select it — then drag its corners to resize, the top ball to rotate, and tick the box to show it to players. Notes are GM-only (note tool). Drag a selection, press Delete to remove.</p>
           <input id="addImageInput" type="file" accept="image/*" hidden>
           <input id="pdfFileInput" type="file" accept="application/pdf" multiple hidden>
-          <div id="aoeMarkerSelPanel" class="hidden">
-            <label>
-              Area label (GM-only)
-              <input id="aoeMarkerLabel" type="text" placeholder="e.g. fire">
-            </label>
-            <label class="checkbox-row">
-              <input id="aoeMarkerShowPlayers" type="checkbox" checked>
-              <span>Show to players</span>
-            </label>
-          </div>
-
           <div class="subsection-title">
             <h3>Player view</h3>
             <label class="switch with-label">
@@ -418,6 +407,18 @@
             </div>
           </div>
 
+          <!-- Right under the toolbar, so a tool's options open below it. -->
+          <div class="player-toggles">
+            <label class="toggle-chip">
+              <input id="splashEnabled" type="checkbox">
+              <span>Splash</span>
+            </label>
+            <label class="toggle-chip">
+              <input id="blackoutEnabled" type="checkbox">
+              <span>Blackout</span>
+            </label>
+          </div>
+
           <div class="tool-popover hidden" id="brushOptions">
             <h2 id="fogToolHeading">Fog Tool</h2>
             <label id="brushSizeRow">
@@ -491,7 +492,7 @@
                 <span class="token-rolls-title">Rolls</span>
                 <div id="tokenRollList" class="token-roll-list"></div>
                 <form id="tokenRollAdd" class="token-roll-add" autocomplete="off">
-                  <input id="tokenRollName" type="text" maxlength="24" placeholder="Name, e.g. Scimitar" aria-label="Roll name">
+                  <input id="tokenRollName" type="text" maxlength="24" placeholder="e.g. Scimitar" aria-label="Roll name">
                   <input id="tokenRollExpr" type="text" maxlength="40" placeholder="1d20+4" aria-label="Dice to roll" spellcheck="false">
                   <button type="submit" title="Save this roll on the token" aria-label="Add roll">+</button>
                 </form>
@@ -563,15 +564,18 @@
             </div>
           </div>
 
-          <div class="player-toggles">
-            <label class="toggle-chip">
-              <input id="splashEnabled" type="checkbox">
-              <span>Splash</span>
+          <!-- A spell area selected in Move mode: its GM-only label and whether players see it. -->
+          <div class="tool-popover hidden" id="aoeMarkerSelPanel">
+            <h2>Spell area</h2>
+            <label>
+              Label (GM only)
+              <input id="aoeMarkerLabel" type="text" placeholder="e.g. Wall of Fire" autocomplete="off">
             </label>
-            <label class="toggle-chip">
-              <input id="blackoutEnabled" type="checkbox">
-              <span>Blackout</span>
+            <label class="checkbox-row">
+              <input id="aoeMarkerShowPlayers" type="checkbox" checked>
+              <span>Show to players</span>
             </label>
+            <p class="hint">Press Delete or right-click it to remove it.</p>
           </div>
         </div>
 
@@ -841,15 +845,17 @@
         </div>
         <div id="initList" class="init-list"></div>
         <form id="initAddForm" class="init-add" autocomplete="off">
-          <input id="initName" type="text" placeholder="Name" maxlength="24" required>
-          <div class="init-add-row">
-            <input id="initRoll" type="text" placeholder="Init / +2" maxlength="20" title="Initiative: a number, or a modifier like +2 (or a roll like d20+2) to roll it now and again with “Roll initiative”">
-            <input id="initHp" type="text" placeholder="HP / 2d8+2" maxlength="20" title="Hit points: a number, or hit dice like 2d8+2 to roll them">
-            <select id="initType">
+          <div class="init-add-row init-add-name">
+            <input id="initName" type="text" placeholder="Name" maxlength="24" required>
+            <select id="initType" aria-label="Kind">
               <option value="player">Player</option>
               <option value="npc">NPC</option>
               <option value="monster">Monster</option>
             </select>
+          </div>
+          <div class="init-add-row">
+            <input id="initRoll" type="text" placeholder="Init / +2" maxlength="20" title="Initiative: a number, or a modifier like +2 (or a roll like d20+2) to roll it now and again with “Roll initiative”">
+            <input id="initHp" type="text" placeholder="HP / 2d8+2" maxlength="20" title="Hit points: a number, or hit dice like 2d8+2 to roll them">
           </div>
           <button type="submit">Add character</button>
         </form>

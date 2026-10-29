@@ -570,7 +570,15 @@ button:hover {
   grid-template-columns: 300px minmax(0, 1fr) 0px;
   height: 100vh;
   transition: grid-template-columns 0.28s ease;
+  user-select: none; /* a drag that strays off the map shouldn't paint the controls blue */
   width: 100vw;
+}
+
+/* …but text you type, and GM notes, select as usual. */
+.app-shell input,
+.app-shell textarea,
+.app-shell [contenteditable="true"] {
+  user-select: text;
 }
 
 .app-shell.has-initiative,
@@ -1092,9 +1100,23 @@ input:disabled {
   flex-direction: column;
   gap: 10px;
   left: 30px;
+  max-height: calc(100% - 28px);
   position: absolute;
   top: 14px;
   z-index: 7;
+}
+
+/* On a short screen a tall popover (the selected-token editor) scrolls inside the stage
+   instead of running off the bottom; the toolbar above it keeps its size. */
+.stage-controls > * {
+  flex-shrink: 0;
+}
+
+.stage-controls > .tool-popover {
+  flex-shrink: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .mode-hint-bar {
@@ -1206,7 +1228,7 @@ input:disabled {
 }
 
 .tool-popover {
-  background: rgba(25, 28, 29, 0.94);
+  background: rgba(25, 28, 29, 0.985);
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--text);
@@ -1945,10 +1967,16 @@ input:disabled {
   fill-opacity: 0.22;
 }
 
+/* A long order scrolls on its own, so the add form below it stays in view. */
 .init-list {
   display: flex;
+  flex: 0 1 auto;
   flex-direction: column;
   gap: 6px;
+  min-height: 90px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  position: relative; /* rows' offsetTop is measured from here (see renderInitiativePanel) */
 }
 
 .init-row {
@@ -2180,7 +2208,11 @@ input:disabled {
 .init-add-row {
   display: grid;
   gap: 8px;
-  grid-template-columns: 1fr 1fr 1.2fr;
+  grid-template-columns: 1fr 1fr;
+}
+
+.init-add-name {
+  grid-template-columns: 1fr auto;
 }
 
 .init-add button[type="submit"] {
