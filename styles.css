@@ -2995,6 +2995,33 @@ input:disabled {
   z-index: 8;
 }
 
+/* Weather sits just above the map (below notes, handles, overlays and dice). The GM sees a
+   faint copy so it doesn't get in the way of running the game. */
+.weather-layer {
+  height: 100%;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  z-index: 3;
+}
+
+.weather-layer[hidden] {
+  display: none;
+}
+
+.app-shell[data-role="gm"] .weather-layer {
+  opacity: 0.5;
+}
+
+.weather-flash {
+  justify-self: start;
+}
+
+.weather-flash[hidden] {
+  display: none;
+}
+
 .dice-layer[hidden] {
   display: none;
 }
