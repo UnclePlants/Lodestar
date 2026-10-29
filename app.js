@@ -243,6 +243,12 @@ const controls = {
   diceCrits: document.getElementById("diceCrits"),
   diceStyleReset: document.getElementById("diceStyleReset"),
   diceHistory: document.getElementById("diceHistory"),
+  weatherLayer: document.getElementById("weatherLayer"),
+  weatherKinds: document.getElementById("weatherKinds"),
+  weatherIntensity: document.getElementById("weatherIntensity"),
+  weatherWind: document.getElementById("weatherWind"),
+  weatherOnGm: document.getElementById("weatherOnGm"),
+  weatherFlash: document.getElementById("weatherFlash"),
 };
 
 // Per-bed control lookup so the music code can treat the two looping layers identically.
@@ -326,6 +332,9 @@ const state = {
   // Measurement: unit system + an optional calibrated cell size (world px) used when the
   // grid overlay is off but the map has its own printed grid.
   measure: { unit: "imperial", cellSize: 0 },
+  // Weather over the map on the player display (see weather.js): none | rain | storm | snow |
+  // fog | embers, intensity 0.1–1, wind -1 (blowing left) … 1 (blowing right).
+  weather: { kind: "none", intensity: 0.6, wind: 0.3 },
   // Views carry a rotation (degrees) so the map can be re-oriented. The GM "rotate map"
   // drives view.rotation; the player can be rotated independently via playerView.rotation.
   view: { scale: 1, cx: 0, cy: 0, rotation: 0 },
@@ -444,6 +453,7 @@ function handleMessage(message, source) {
   }
   if (message.type === "music" && isPlayer) applyMusicMessage(message);
   if (message.type === "dice" && isPlayer && message.roll) playDiceRoll(message.roll, audioUnlocked);
+  if (message.type === "weather-flash" && isPlayer) weather?.flash();
   if (message.type === "player-ready" && !isPlayer) {
     if (source) playerWindow = source;
     playerHasClip.clear(); // a new display has none of the audio yet
@@ -1179,6 +1189,7 @@ function setup() {
     updateInitiativeUI();
   }
   setupDice();
+  setupWeather();
 
   // Two transports so the link works whether or not BroadcastChannel delivers between
   // windows (it is unreliable on file://): the BroadcastChannel and a direct
@@ -1942,6 +1953,7 @@ function loadSnapshot(snapshot) {
   if (state.grid.snap === undefined) state.grid.snap = true;
   if (snapshot.stairColor) state.stairColor = snapshot.stairColor;
   if (snapshot.measure) Object.assign(state.measure, snapshot.measure);
+  if (window.LodestarWeather) state.weather = LodestarWeather.normWeather(snapshot.weather); // none if the map has none
   if (snapshot.initiative) {
     state.initiative = { active: false, showPlayers: false, showOverlay: true, round: 1, turn: 0, combatants: [], ...snapshot.initiative };
   }
@@ -2056,6 +2068,7 @@ function applyIncomingPlayerView(pv) {
 
 function syncControlsFromState() {
   if (isPlayer) return;
+  syncWeatherControls();
   controls.gridEnabled.checked = state.grid.enabled;
   controls.gridSnap.checked = state.grid.snap;
   if (controls.imageSnap) controls.imageSnap.checked = !!state.grid.snapImages;
@@ -2435,6 +2448,17 @@ function broadcastView() {
 function renderAndSync() {
   render();
   broadcastState();
+}
+
+// For controls that change continuously (sliders): at most one state sync per frame.
+let stateSyncQueued = false;
+function queueStateSync() {
+  if (stateSyncQueued) return;
+  stateSyncQueued = true;
+  requestAnimationFrame(() => {
+    stateSyncQueued = false;
+    broadcastState();
+  });
 }
 
 function renderAndSyncView() {
@@ -2894,6 +2918,7 @@ function releasePointer(pointerId) {
 /* ----------------------------- render ----------------------------- */
 
 function render() {
+  applyWeather();
   const rect = canvas.getBoundingClientRect();
   ctx.clearRect(0, 0, rect.width, rect.height);
   ctx.fillStyle = "#080909";
@@ -5295,6 +5320,73 @@ function resyncMusicToPlayer() {
       });
     }
   });
+}
+
+/* ----------------------------- weather -----------------------------
+
+weather.js draws rain, storms, snow, fog and embers on an overlay above the map. The GM picks it
+in the Weather section; it lives in state.weather, so it syncs to the player display and saves
+with the map. The player hides it during a blackout or splash screen (and with no map); the GM
+sees a faint copy unless "Show it faintly on my screen too" is off (remembered per browser). */
+
+const WEATHER_GM_KEY = "lodestar.weatherOnGm";
+let weather = null; // the weather.js overlay for this window
+let weatherOnGm = true;
+let weatherApplied = ""; // the setting last handed to the overlay, so render() can skip repeats
+
+function setupWeather() {
+  if (!window.LodestarWeather || !controls.weatherLayer) return;
+  const calm = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; // no lightning
+  weather = LodestarWeather.createWeather(controls.weatherLayer, { calm });
+  if (isPlayer) return;
+  try {
+    weatherOnGm = localStorage.getItem(WEATHER_GM_KEY) !== "0";
+  } catch {}
+  controls.weatherKinds?.addEventListener("click", (event) => {
+    const kind = event.target.closest("[data-weather]")?.dataset.weather;
+    if (kind) setWeather({ kind });
+  });
+  controls.weatherIntensity?.addEventListener("input", () => setWeather({ intensity: Number(controls.weatherIntensity.value) }));
+  controls.weatherWind?.addEventListener("input", () => setWeather({ wind: Number(controls.weatherWind.value) }));
+  controls.weatherFlash?.addEventListener("click", () => {
+    weather.flash();
+    relay({ type: "weather-flash" });
+  });
+  controls.weatherOnGm?.addEventListener("change", () => {
+    weatherOnGm = controls.weatherOnGm.checked;
+    try {
+      localStorage.setItem(WEATHER_GM_KEY, weatherOnGm ? "1" : "0");
+    } catch {}
+    applyWeather();
+  });
+  syncWeatherControls();
+}
+
+function setWeather(patch) {
+  state.weather = LodestarWeather.normWeather({ ...state.weather, ...patch });
+  syncWeatherControls();
+  applyWeather();
+  queueStateSync();
+}
+
+function syncWeatherControls() {
+  if (isPlayer || !controls.weatherKinds) return;
+  controls.weatherKinds.querySelectorAll("[data-weather]").forEach((b) => b.classList.toggle("active", b.dataset.weather === state.weather.kind));
+  controls.weatherIntensity.value = String(state.weather.intensity);
+  controls.weatherWind.value = String(state.weather.wind);
+  controls.weatherOnGm.checked = weatherOnGm;
+  if (controls.weatherFlash) controls.weatherFlash.hidden = state.weather.kind !== "storm";
+}
+
+// Hand the overlay what this window should show right now (called from render()).
+function applyWeather() {
+  if (!weather) return;
+  const hide = !state.imageData || (isPlayer ? state.blackout || state.splash.enabled : !weatherOnGm);
+  const next = hide ? { kind: "none" } : state.weather;
+  const key = JSON.stringify(next);
+  if (key === weatherApplied) return;
+  weatherApplied = key;
+  weather.set(next);
 }
 
 /* ----------------------------- dice roller -----------------------------
