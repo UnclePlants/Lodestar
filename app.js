@@ -598,6 +598,19 @@ function setupStartScreen() {
   demoBtn?.addEventListener("focus", prefetchDemo, { once: true });
   demoBtn?.addEventListener("click", (event) => loadDemoMap(event.currentTarget, dismiss));
   document.getElementById("startCredits")?.addEventListener("click", () => document.getElementById("creditsDialog")?.showModal());
+  // An autosaved session from last time: offer to pick it up.
+  const resumeBtn = document.getElementById("startResume");
+  if (resumeBtn) {
+    resumeBtn.addEventListener("click", (event) => resumeSession(event.currentTarget, dismiss));
+    readSession(false)
+      .then(({ record }) => {
+        if (!record || !screen.isConnected) return;
+        const meta = document.getElementById("startResumeMeta");
+        if (meta) meta.textContent = [record.name || "Untitled map", timeAgo(record.savedAt)].filter(Boolean).join(" · ");
+        resumeBtn.hidden = false;
+      })
+      .catch(() => {});
+  }
   window.addEventListener("keydown", onStartKey);
 }
 
@@ -1260,6 +1273,7 @@ function setup() {
     updateUndoButtons();
     setupCollapsibleSections();
     updateInitiativeUI();
+    setupAutosave();
   }
   setupDice();
   setupWeather();
@@ -1725,6 +1739,8 @@ function loadMapFile(event) {
   reader.onerror = () => window.alert("Could not read that map file.");
   reader.onload = () => {
     shell.classList.remove("is-demo"); // your own map: drop the demo-map credit
+    libraryContentSig = null; // a new map isn't in the library yet
+    sessionMapName = "";
     state.imageData = reader.result;
     state.imageName = file.name;
     state.imageId = uuid();
@@ -1791,6 +1807,7 @@ function saveSession() {
   // The floor records already carry every map, so skip the top-level mirror of the current
   // one rather than storing it twice (that matters once a map is a video).
   const { imageData, ...savedState } = state;
+  const sig = contentSig(sessionContent());
   let saveData;
   try {
     saveData = {
@@ -1808,6 +1825,7 @@ function saveSession() {
 
   saveMapRecord(saveData)
     .then(() => {
+      markLibrarySaved(saveData.name, sig);
       window.alert(`Saved "${saveData.name}" to the local map library.`);
       refreshLibraryButtonState();
     })
@@ -1938,6 +1956,7 @@ async function loadLibraryMap(id) {
     syncControlsFromState();
     broadcastAssets();
     renderAndSync();
+    markLibrarySaved(data.name || "");
     controls.libraryDialog.close();
   } catch (error) {
     window.alert(`Could not load this map: ${error.message}`);
@@ -2055,6 +2074,239 @@ function getMapRecord(id) {
 }
 function deleteMapRecord(id) {
   return withMapStore("readwrite", (store) => store.delete(id));
+}
+
+/* ----------------------------- session autosave -----------------------------
+
+The GM's working session is autosaved every few seconds to its own IndexedDB database, so a
+closed tab, a crash or a stray F5 never loses the fog, tokens, HP and conditions since the last
+"Save map"; the welcome screen then offers to resume it. Map media (megabytes, or a whole video)
+is stored once per image under its imageId, so routine autosaves only write the light state.
+The demo is never autosaved, so trying it can't replace a real session. Closing the tab with
+changes that aren't in the map library asks first. */
+
+const SESSION_DB = "lodestar-session";
+const SESSION_STORE = "session";
+const AUTOSAVE_MS = 4000;
+let autosaveJson = ""; // the session last written, so unchanged ticks skip the write
+let autosaveBusy = false;
+let autosaveWarned = false;
+const autosavedMedia = new Set(); // media keys already in the session store
+let autosavedSplash = ""; // the splash image already in the session store
+let libraryContentSig = null; // the content last saved to / loaded from the map library (null: never)
+let sessionMapName = ""; // the library name this session was saved or loaded as, if any
+
+function openSessionDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(SESSION_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(SESSION_STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Runs `work(store)` in one transaction and resolves, once it commits, with what `work`
+// returned (or that request's result).
+async function withSessionStore(modeName, work) {
+  const db = await openSessionDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(SESSION_STORE, modeName);
+    let out;
+    try {
+      out = work(transaction.objectStore(SESSION_STORE));
+    } catch (error) {
+      db.close();
+      reject(error);
+      return;
+    }
+    transaction.oncomplete = () => {
+      db.close();
+      resolve(out instanceof IDBRequest ? out.result : out);
+    };
+    transaction.onerror = transaction.onabort = () => {
+      db.close();
+      reject(transaction.error);
+    };
+  });
+}
+
+// The session minus its map media: floors keep their imageId, and the media goes under its own key.
+function sessionContent() {
+  captureCurrentFloor();
+  // eslint-disable-next-line no-unused-vars
+  const { imageData, floors, splash, ...rest } = state;
+  return {
+    ...rest,
+    splash: { ...splash, imageData: "" },
+    floors: floors.map((f) => (f.imageId ? { ...f, imageData: "" } : f)),
+  };
+}
+
+// What counts as a change worth keeping: not where the GM is looking or how a tool is set up.
+const VIEW_ONLY_KEYS = new Set(["view", "playerView", "currentFloorId", "toolSize", "toolShape", "stampShape"]);
+function contentSig(content) {
+  return JSON.stringify(content, (key, value) => (VIEW_ONLY_KEYS.has(key) ? undefined : value));
+}
+
+function sessionHasMap() {
+  return !isPlayer && !shell.classList.contains("is-demo") && state.floors.some((f) => f.imageData);
+}
+
+function hasUnsavedChanges() {
+  return sessionHasMap() && contentSig(sessionContent()) !== libraryContentSig;
+}
+
+// Remember the session as matching the library, once a load has settled (the map decoded,
+// one frame drawn).
+function markLibrarySaved(name, sig) {
+  sessionMapName = name;
+  if (sig) {
+    libraryContentSig = sig;
+    return;
+  }
+  libraryContentSig = null;
+  whenMapReady(4000).then(() => requestAnimationFrame(() => (libraryContentSig = contentSig(sessionContent()))));
+}
+
+async function autosaveSession() {
+  if (autosaveBusy || !sessionHasMap()) return;
+  const content = sessionContent();
+  const json = JSON.stringify(content);
+  if (json === autosaveJson) return;
+  const media = new Map();
+  state.floors.forEach((f) => {
+    if (f.imageId && f.imageData) media.set(`media:${f.imageId}`, f.imageData);
+  });
+  const splash = state.splash.imageData || "";
+  const record = {
+    app: APP_NAME,
+    version: SAVE_FILE_VERSION,
+    savedAt: new Date().toISOString(),
+    name: sessionMapName || (state.floors.find((f) => f.imageName)?.imageName || "").replace(/\.[^.]+$/, ""),
+    libraryName: sessionMapName,
+    unsaved: contentSig(content) !== libraryContentSig,
+    json,
+  };
+  autosaveBusy = true;
+  try {
+    await withSessionStore("readwrite", (store) => {
+      media.forEach((data, key) => {
+        if (!autosavedMedia.has(key)) store.put(data, key);
+      });
+      if (splash && splash !== autosavedSplash) store.put(splash, "splash");
+      store.put(record, "session");
+      // Drop media this session no longer uses (including a previous session's).
+      const keep = new Set(["session", ...media.keys()]);
+      if (splash) keep.add("splash");
+      const keys = store.getAllKeys();
+      keys.onsuccess = () =>
+        keys.result.forEach((key) => {
+          if (!keep.has(key)) store.delete(key);
+        });
+    });
+    autosavedMedia.clear();
+    media.forEach((_, key) => autosavedMedia.add(key));
+    autosavedSplash = splash;
+    autosaveJson = json;
+  } catch (error) {
+    if (!autosaveWarned) console.warn("Lodestar could not autosave this session:", error);
+    autosaveWarned = true;
+  } finally {
+    autosaveBusy = false;
+  }
+}
+
+// The autosaved session: its record, plus (withMedia) every stored image by key.
+function readSession(withMedia) {
+  return withSessionStore("readonly", (store) => {
+    const out = { record: null, media: new Map() };
+    const request = store.get("session");
+    request.onsuccess = () => {
+      out.record = request.result || null;
+      if (!withMedia || !out.record) return;
+      const keys = store.getAllKeys();
+      keys.onsuccess = () =>
+        keys.result.forEach((key) => {
+          if (key === "session") return;
+          const media = store.get(key);
+          media.onsuccess = () => out.media.set(key, media.result);
+        });
+    };
+    return out;
+  });
+}
+
+function resumeSession(btn, dismiss) {
+  const original = btn ? btn.innerHTML : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add("is-loading");
+    btn.textContent = "Resuming";
+  }
+  readSession(true)
+    .then(({ record, media }) => {
+      if (!record) throw new Error("there's no autosaved session any more");
+      const snapshot = validateSessionData({ app: record.app, version: record.version, state: JSON.parse(record.json) });
+      snapshot.floors.forEach((f) => {
+        if (f.imageId && media.has(`media:${f.imageId}`)) f.imageData = media.get(`media:${f.imageId}`);
+      });
+      snapshot.splash = { ...snapshot.splash, imageData: media.get("splash") || "" };
+      shell.classList.remove("is-demo");
+      drawingRoom = [];
+      activeStroke = null;
+      undoStack.length = 0;
+      redoStack.length = 0;
+      updateUndoButtons();
+      loadSnapshot(snapshot);
+      syncControlsFromState();
+      broadcastAssets();
+      renderAndSync();
+      autosavedMedia.clear();
+      media.forEach((_, key) => key !== "splash" && autosavedMedia.add(key));
+      autosavedSplash = state.splash.imageData;
+      autosaveJson = record.json;
+      if (record.unsaved) {
+        sessionMapName = record.libraryName || "";
+        libraryContentSig = null;
+      } else markLibrarySaved(record.libraryName || "");
+      return whenMapReady(4000);
+    })
+    .then(() => {
+      render();
+      if (dismiss) dismiss();
+    })
+    .catch((error) => {
+      window.alert(`Could not resume the last session: ${error?.message || error}`);
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove("is-loading");
+        btn.innerHTML = original;
+      }
+    });
+}
+
+// "just now", "5 min ago", "3 h ago", "yesterday", or the date.
+function timeAgo(iso) {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (!(s >= 0)) return "";
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  if (s < 2 * 86400) return "yesterday";
+  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+function setupAutosave() {
+  if (isPlayer) return;
+  setInterval(autosaveSession, AUTOSAVE_MS);
+  document.addEventListener("visibilitychange", () => document.hidden && autosaveSession());
+  window.addEventListener("pagehide", () => autosaveSession());
+  window.addEventListener("beforeunload", (event) => {
+    if (!hasUnsavedChanges()) return;
+    autosaveSession();
+    event.preventDefault();
+    event.returnValue = ""; // older browsers need this to ask
+  });
 }
 
 /* ----------------------------- snapshots / sync ----------------------------- */
