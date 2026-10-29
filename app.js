@@ -5930,7 +5930,7 @@ let weatherApplied = ""; // the setting last handed to the overlay, so render() 
 
 function setupWeather() {
   if (!window.LodestarWeather || !controls.weatherLayer) return;
-  const calm = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; // no lightning
+  const calm = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; // lightning swells, no flicker
   weather = LodestarWeather.createWeather(controls.weatherLayer, { calm });
   if (isPlayer) return;
   try {

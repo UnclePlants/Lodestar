@@ -6,8 +6,9 @@
  * intensity (0.1–1) and wind (-1 = blowing left … 1 = blowing right); app.js mirrors that to the
  * player display with the rest of the state.
  *
- * Lightning is a soft brightening several seconds apart (or when the GM calls it), never
- * anywhere near three flashes a second; with { calm: true } (reduced motion) there's none.
+ * Lightning is a brightening several seconds apart (or when the GM calls it), never anywhere
+ * near three flashes a second; with { calm: true } (reduced motion) it's one slow swell instead
+ * of a flicker.
  */
 (function () {
   "use strict";
@@ -140,7 +141,7 @@
         });
         splashes.forEach((s) => (s.t += dt));
         splashes = splashes.filter((s) => s.t < 0.3);
-        if (k === "storm" && !calm && clock >= nextFlash) {
+        if (k === "storm" && clock >= nextFlash) {
           flashAt = clock;
           nextFlash = clock + rnd(5, 13);
         }
@@ -169,9 +170,15 @@
     }
 
     // The storm's flash: a quick double flicker, then a slow fade (0 → ~1 → 0 over ~0.9 s).
+    // Calm: one gentle swell (up over 0.3 s, down over ~1.2 s), no flicker.
     function flashLevel() {
       if (flashAt < 0) return 0;
       const t = clock - flashAt;
+      if (calm) {
+        if (t > 1.6) return 0;
+        if (t < 0.3) return 0.85 * Math.sin((t / 0.3) * Math.PI * 0.5);
+        return 0.85 * Math.exp(-(t - 0.3) * 3);
+      }
       if (t > 0.9) return 0;
       if (t < 0.06) return t / 0.06;
       if (t < 0.14) return 1 - ((t - 0.06) / 0.08) * 0.8;
@@ -187,9 +194,11 @@
       const I = cfg.intensity;
       const k = cfg.kind;
       if (k === "rain" || k === "storm") {
-        // A cool, darker sky, then the streaks (one batched path per brightness band).
+        // A cool, darker sky (lifted while lightning flashes), then the streaks (one batched
+        // path per brightness band).
+        const f = flashLevel();
         ctx.globalAlpha = 1;
-        ctx.fillStyle = `rgba(8, 16, 30, ${k === "storm" ? 0.12 + 0.2 * I : 0.05 + 0.1 * I})`;
+        ctx.fillStyle = `rgba(8, 16, 30, ${(k === "storm" ? 0.12 + 0.2 * I : 0.05 + 0.1 * I) * (1 - f)})`;
         ctx.fillRect(0, 0, w, h);
         const slant = cfg.wind * (k === "storm" ? 0.56 : 0.38);
         ctx.lineCap = "round";
@@ -217,10 +226,9 @@
           ctx.ellipse(s.x, s.y, 1 + 6 * e, 0.5 + 2.4 * e, 0, 0, Math.PI * 2);
           ctx.stroke();
         });
-        const f = flashLevel();
         if (f > 0) {
           ctx.globalAlpha = 1;
-          ctx.fillStyle = `rgba(214, 226, 255, ${0.3 * f})`;
+          ctx.fillStyle = `rgba(214, 226, 255, ${0.5 * f})`;
           ctx.fillRect(0, 0, w, h);
         }
       } else if (k === "snow") {
@@ -307,7 +315,7 @@
 
     // Lightning right now (the GM's button), during a storm.
     function flash() {
-      if (cfg.kind !== "storm" || calm) return;
+      if (cfg.kind !== "storm") return;
       flashAt = clock;
       nextFlash = clock + rnd(6, 13);
     }
