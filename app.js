@@ -249,6 +249,8 @@ const controls = {
   weatherWind: document.getElementById("weatherWind"),
   weatherOnGm: document.getElementById("weatherOnGm"),
   weatherFlash: document.getElementById("weatherFlash"),
+  transitionsEnabled: document.getElementById("transitionsEnabled"),
+  sceneFade: document.getElementById("sceneFade"),
 };
 
 // Per-bed control lookup so the music code can treat the two looping layers identically.
@@ -335,6 +337,9 @@ const state = {
   // Weather over the map on the player display (see weather.js): none | rain | storm | snow |
   // fog | embers, intensity 0.1–1, wind -1 (blowing left) … 1 (blowing right).
   weather: { kind: "none", intensity: 0.6, wind: 0.3 },
+  // Player display fades: revealed fog fades away, and a map/floor/screen change fades
+  // through black (see "scene fades").
+  transitions: true,
   // Views carry a rotation (degrees) so the map can be re-oriented. The GM "rotate map"
   // drives view.rotation; the player can be rotated independently via playerView.rotation.
   view: { scale: 1, cx: 0, cy: 0, rotation: 0 },
@@ -443,6 +448,16 @@ function handleMessage(message, source) {
     seenMids.push(message.mid);
     if (seenMids.length > 60) seenMids.shift();
   }
+  // Player: a new map, floor, splash or blackout fades through black (see scene fades);
+  // while that's happening, what's drawn on the map waits its turn so nothing jumps ahead.
+  if (isPlayer && (sceneFade.busy ? SCENE_MESSAGES.has(message.type) : state.transitions !== false && isSceneChange(message))) {
+    fadeToScene(message, source);
+    return;
+  }
+  dispatchMessage(message, source);
+}
+
+function dispatchMessage(message, source) {
   if (message.type === "assets" && isPlayer) applyAssets(message);
   if (message.type === "sync" && isPlayer) loadSnapshot(message.state);
   if (message.type === "view" && isPlayer) applyRemoteView(message);
@@ -466,6 +481,52 @@ function handleMessage(message, source) {
     playerViewport = { w: message.w, h: message.h };
     render();
   }
+}
+
+/* ---- scene fades (player display) ----
+A change of scene (another map image, another floor, the splash or blackout screen turned on or
+off) fades the display to black, applies the change once the curtain is down, waits for the new
+map to be ready, and fades back up. Messages that would draw on the map in the meantime are held
+and applied in order with it. Off when the GM unticks "Smooth fades". */
+const SCENE_MESSAGES = new Set(["sync", "assets", "view", "measure"]);
+const sceneFade = { busy: false, queue: [] };
+
+function isSceneChange(message) {
+  if (message.type === "assets") return message.imageId !== state.imageId;
+  if (message.type !== "sync" || !message.state) return false;
+  const s = message.state;
+  return (
+    (!!s.imageId && s.imageId !== state.imageId) ||
+    (!!s.currentFloorId && s.currentFloorId !== state.currentFloorId) ||
+    !!s.blackout !== !!state.blackout ||
+    !!s.splash?.enabled !== !!state.splash.enabled
+  );
+}
+
+function fadeToScene(message, source) {
+  sceneFade.queue.push([message, source]);
+  if (sceneFade.busy) return;
+  sceneFade.busy = true;
+  const curtain = controls.sceneFade;
+  const flush = () => {
+    while (sceneFade.queue.length) dispatchMessage(...sceneFade.queue.shift());
+  };
+  if (curtain) {
+    curtain.style.transitionDuration = "350ms";
+    curtain.classList.add("on");
+  }
+  setTimeout(async () => {
+    flush();
+    await whenMapReady(2500);
+    requestAnimationFrame(() => {
+      flush(); // anything that arrived while the map loaded
+      if (curtain) {
+        curtain.style.transitionDuration = "650ms";
+        curtain.classList.remove("on");
+      }
+      sceneFade.busy = false;
+    });
+  }, 380);
 }
 
 // Player -> GM: report this display's pixel size so the GM can draw the "player frame".
@@ -1313,6 +1374,10 @@ function bindControls() {
     syncMapPlayback();
     renderAndSync();
   });
+  controls.transitionsEnabled?.addEventListener("change", () => {
+    state.transitions = controls.transitionsEnabled.checked;
+    broadcastState();
+  });
 
   controls.panMode.addEventListener("click", () => setMode("pan"));
   controls.fogToggle.addEventListener("click", toggleFogRibbon);
@@ -1954,6 +2019,7 @@ function loadSnapshot(snapshot) {
   if (snapshot.stairColor) state.stairColor = snapshot.stairColor;
   if (snapshot.measure) Object.assign(state.measure, snapshot.measure);
   if (window.LodestarWeather) state.weather = LodestarWeather.normWeather(snapshot.weather); // none if the map has none
+  state.transitions = snapshot.transitions !== false;
   if (snapshot.initiative) {
     state.initiative = { active: false, showPlayers: false, showOverlay: true, round: 1, turn: 0, combatants: [], ...snapshot.initiative };
   }
@@ -1990,6 +2056,7 @@ function loadSnapshot(snapshot) {
     if (snapshot.imageHeight) state.imageHeight = snapshot.imageHeight;
     state.floorPosition = snapshot.floorPosition || 1;
     state.floorCount = snapshot.floorCount || 1;
+    if (snapshot.currentFloorId) state.currentFloorId = snapshot.currentFloorId; // tells floor changes apart (scene fades)
   }
   fogDirty = true;
 
@@ -2069,6 +2136,7 @@ function applyIncomingPlayerView(pv) {
 function syncControlsFromState() {
   if (isPlayer) return;
   syncWeatherControls();
+  if (controls.transitionsEnabled) controls.transitionsEnabled.checked = state.transitions !== false;
   controls.gridEnabled.checked = state.grid.enabled;
   controls.gridSnap.checked = state.grid.snap;
   if (controls.imageSnap) controls.imageSnap.checked = !!state.grid.snapImages;
@@ -3107,9 +3175,46 @@ function buildStrokeLayer() {
   });
 }
 
+/* Player: fog that's revealed fades away instead of vanishing. Before a rebuild the old fog is
+copied (at half resolution, which also softens its edge), and after it the new fog is cut out
+of that copy, leaving just what was revealed; compositeFog() fades that out over REVEAL_MS.
+Only when the fog itself changed, and never for a different map or floor. */
+const revealCanvas = document.createElement("canvas");
+const revealCtx = revealCanvas.getContext("2d");
+const REVEAL_MS = 1100;
+let revealStart = -Infinity;
+let revealRaf = 0;
+let revealScene = ""; // the map + floor the fog was last built for
+let revealFogSig = ""; // a cheap summary of that fog, to tell whether it changed
+
+function fogSignature() {
+  const { rooms, strokes } = state.fog;
+  const last = strokes[strokes.length - 1];
+  return `${rooms.length}:${rooms.map((r) => (r.revealed ? 1 : 0)).join("")}:${strokes.length}:${last?.points?.length || 0}`;
+}
+
+function startRevealLoop() {
+  if (revealRaf) return;
+  const tick = () => {
+    render();
+    revealRaf = performance.now() - revealStart < REVEAL_MS ? requestAnimationFrame(tick) : 0;
+  };
+  revealRaf = requestAnimationFrame(tick);
+}
+
 // Rebuild the committed fog bitmap as the union of the polygon layer and the freeform layer.
 // Full opacity; the GM tint/opacity is applied once at composite time so overlap never darkens.
 function rebuildFog() {
+  const scene = `${state.imageId}|${state.currentFloorId}|${state.imageWidth}x${state.imageHeight}`;
+  const sig = fogSignature();
+  const fade = isPlayer && state.transitions !== false && scene === revealScene && sig !== revealFogSig && fogCanvas.width > 1;
+  revealScene = scene;
+  revealFogSig = sig;
+  if (fade) {
+    revealCanvas.width = Math.max(1, Math.round(fogCanvas.width / 2));
+    revealCanvas.height = Math.max(1, Math.round(fogCanvas.height / 2));
+    revealCtx.drawImage(fogCanvas, 0, 0, revealCanvas.width, revealCanvas.height);
+  }
   resizeFogLayer();
   const color = isPlayer ? "#080909" : state.fog.gmColor;
   // Polygon/stamp areas.
@@ -3131,6 +3236,13 @@ function rebuildFog() {
   fogCtx.drawImage(polyCanvas, 0, 0);
   fogCtx.drawImage(strokeCanvas, 0, 0);
   fogDirty = false;
+  if (fade) {
+    revealCtx.globalCompositeOperation = "destination-out";
+    revealCtx.drawImage(fogCanvas, 0, 0, revealCanvas.width, revealCanvas.height);
+    revealCtx.globalCompositeOperation = "source-over";
+    revealStart = performance.now();
+    startRevealLoop();
+  }
 }
 
 function compositeFog() {
@@ -3157,6 +3269,12 @@ function compositeFog() {
   ctx.globalAlpha = isPlayer ? 1 : state.fog.gmOpacity;
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(source, 0, 0, fogCanvas.width, fogCanvas.height, 0, 0, state.imageWidth, state.imageHeight);
+  // Player: the fog just revealed, fading away.
+  const k = (performance.now() - revealStart) / REVEAL_MS;
+  if (isPlayer && k < 1) {
+    ctx.globalAlpha = 1 - k * k * (3 - 2 * k);
+    ctx.drawImage(revealCanvas, 0, 0, revealCanvas.width, revealCanvas.height, 0, 0, state.imageWidth, state.imageHeight);
+  }
   ctx.restore();
 }
 

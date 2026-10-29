@@ -176,6 +176,10 @@
             <input id="mapAnimate" type="checkbox" checked>
             <span>Play animated map (GIF / video)</span>
           </label>
+          <label class="checkbox-row" title="On the player display, revealed fog fades away, and changing map or floor (or the splash / blackout screens) fades through black">
+            <input id="transitionsEnabled" type="checkbox" checked>
+            <span>Smooth fades on the player display</span>
+          </label>
           <div class="field-with-action">
             <span class="calib-label">Rotate map (carries fog, tokens &amp; stairs)</span>
             <button id="rotateMapLeft" class="mini-btn" type="button" title="Rotate map left" aria-label="Rotate map left">
@@ -566,6 +570,8 @@
         <canvas id="battlemap" aria-label="Battlemap canvas"></canvas>
         <!-- Weather (drawn by weather.js) over the map: rain, snow, fog, embers. -->
         <canvas id="weatherLayer" class="weather-layer" aria-hidden="true"></canvas>
+        <!-- Player display: fades to black and back when the map, floor or screen changes. -->
+        <div id="sceneFade" class="scene-fade" aria-hidden="true"></div>
         <div class="empty-state" id="emptyState">
           <strong>No map loaded</strong>
           <span>Load a local image, GIF or video from the GM panel.</span>

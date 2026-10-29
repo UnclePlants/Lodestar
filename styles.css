@@ -3018,6 +3018,22 @@ input:disabled {
   justify-self: start;
 }
 
+/* Player display: the black curtain a scene change fades through (driven from app.js). It sits
+   over the map, weather and overlays, below the dice. */
+.scene-fade {
+  background: #080909;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 0.35s ease;
+  z-index: 7;
+}
+
+.scene-fade.on {
+  opacity: 1;
+}
+
 .weather-flash[hidden] {
   display: none;
 }
