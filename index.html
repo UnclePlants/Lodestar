@@ -625,10 +625,64 @@
               <input id="diceSound" type="checkbox" checked>
               <span>Sound</span>
             </label>
-            <label class="dice-color" title="Dice colour">
-              <input id="diceColor" type="color" value="#8c1c2c">
-            </label>
           </div>
+          <!-- How the dice look: sent with every roll, so the player display shows the same dice. -->
+          <details id="diceStyle" class="dice-style">
+            <summary><span class="dice-style-swatch" aria-hidden="true"></span>Dice style</summary>
+            <canvas id="dicePreview" class="dice-preview" aria-hidden="true"></canvas>
+            <div class="dice-presets" id="dicePresets" role="group" aria-label="Ready-made looks">
+              <button type="button" data-preset="ruby" title="Ruby">Ruby</button>
+              <button type="button" data-preset="bone" title="Bone">Bone</button>
+              <button type="button" data-preset="gold" title="Gold">Gold</button>
+              <button type="button" data-preset="ice" title="Ice">Ice</button>
+              <button type="button" data-preset="obsidian" title="Obsidian">Obsidian</button>
+              <button type="button" data-preset="emerald" title="Emerald">Emerald</button>
+            </div>
+            <div class="dice-style-grid">
+              <label for="diceColor">Colour</label>
+              <input id="diceColor" type="color" value="#8c1c2c">
+              <label for="diceInk">Numbers</label>
+              <span class="dice-ink">
+                <input id="diceInk" type="color" value="#f6eed8">
+                <button type="button" id="diceInkAuto" title="Pick light or dark numbers to suit the dice colour">Auto</button>
+              </span>
+              <label for="diceSize">Size</label>
+              <span class="dice-size">
+                <input id="diceSize" type="range" min="60" max="150" step="5" value="100">
+                <output id="diceSizeOut" for="diceSize">100%</output>
+              </span>
+              <label for="diceFinish">Finish</label>
+              <select id="diceFinish">
+                <option value="satin">Satin</option>
+                <option value="matte">Matte</option>
+                <option value="glossy">Glossy</option>
+                <option value="metal">Metal</option>
+                <option value="glass">Glass</option>
+              </select>
+              <label for="diceFont">Font</label>
+              <select id="diceFont">
+                <option value="sans">Clean</option>
+                <option value="serif">Serif</option>
+                <option value="garamond">Garamond</option>
+                <option value="impact">Impact</option>
+                <option value="script">Script</option>
+                <option value="papyrus">Papyrus</option>
+                <option value="mono">Typewriter</option>
+              </select>
+              <label for="diceEffect">Effect</label>
+              <select id="diceEffect">
+                <option value="none">None</option>
+                <option value="glow">Glow</option>
+                <option value="trail">Trail</option>
+                <option value="sparkles">Sparks</option>
+              </select>
+            </div>
+            <label class="checkbox-row">
+              <input id="diceCrits" type="checkbox" checked>
+              <span>Flash natural 20s and 1s</span>
+            </label>
+            <button type="button" id="diceStyleReset" class="dice-style-reset">Reset to default</button>
+          </details>
           <ol id="diceHistory" class="dice-history" aria-label="Recent rolls"></ol>
         </div>
         <!-- Credit + support link for the demo map creator, bottom-center of the map (GM only). -->

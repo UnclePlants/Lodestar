@@ -230,6 +230,18 @@ const controls = {
   dicePublic: document.getElementById("dicePublic"),
   diceSound: document.getElementById("diceSound"),
   diceColor: document.getElementById("diceColor"),
+  diceStyle: document.getElementById("diceStyle"),
+  dicePreview: document.getElementById("dicePreview"),
+  dicePresets: document.getElementById("dicePresets"),
+  diceInk: document.getElementById("diceInk"),
+  diceInkAuto: document.getElementById("diceInkAuto"),
+  diceSize: document.getElementById("diceSize"),
+  diceSizeOut: document.getElementById("diceSizeOut"),
+  diceFinish: document.getElementById("diceFinish"),
+  diceFont: document.getElementById("diceFont"),
+  diceEffect: document.getElementById("diceEffect"),
+  diceCrits: document.getElementById("diceCrits"),
+  diceStyleReset: document.getElementById("diceStyleReset"),
   diceHistory: document.getElementById("diceHistory"),
 };
 
@@ -5293,7 +5305,17 @@ to the player display as the recorded tumble, so both screens show the identical
 secret roll never leaves the GM window. Tray preferences are remembered per browser. */
 
 const DICE_PREFS_KEY = "lodestar.dice";
-const dice = { stage: null, prefs: { color: "#8c1c2c", public: false, sound: true }, history: [], bannerTimer: 0 };
+// prefs: the tray's switches plus the dice look (colour, ink, size, font, finish, effect, crits).
+const dice = { stage: null, preview: null, previewRaf: 0, prefs: { color: "#8c1c2c", public: false, sound: true }, history: [], bannerTimer: 0 };
+// Ready-made looks for the dice tray. They leave the size and the crit flash as they are.
+const DICE_PRESETS = {
+  ruby: { color: "#8c1c2c", ink: "", finish: "satin", font: "sans", effect: "none" },
+  bone: { color: "#e8dcc0", ink: "#2b2118", finish: "matte", font: "garamond", effect: "none" },
+  gold: { color: "#c99a2e", ink: "#3b2a06", finish: "metal", font: "serif", effect: "sparkles" },
+  ice: { color: "#7cc8f2", ink: "#ffffff", finish: "glass", font: "sans", effect: "glow" },
+  obsidian: { color: "#17151f", ink: "#d6e64a", finish: "glossy", font: "impact", effect: "trail" },
+  emerald: { color: "#0f7a4a", ink: "#f3e6b0", finish: "glossy", font: "papyrus", effect: "glow" },
+};
 
 function setupDice() {
   if (!window.LodestarDice || !controls.diceLayer) return;
@@ -5302,9 +5324,10 @@ function setupDice() {
   try {
     Object.assign(dice.prefs, JSON.parse(localStorage.getItem(DICE_PREFS_KEY) || "{}"));
   } catch {}
-  controls.diceColor.value = dice.prefs.color;
+  if (controls.dicePreview) dice.preview = LodestarDice.createStage(controls.dicePreview);
   controls.dicePublic.checked = !!dice.prefs.public;
   controls.diceSound.checked = dice.prefs.sound !== false;
+  setupDiceStyle();
   controls.diceToggle?.addEventListener("click", () => toggleDicePanel());
   controls.diceClose?.addEventListener("click", () => toggleDicePanel(false));
   // Click adds a die; right-click (or shift-click) takes one back off.
@@ -5343,7 +5366,6 @@ function setupDice() {
   controls.diceDis?.addEventListener("click", () => rollDice(withAdvantage("l")));
   controls.dicePublic?.addEventListener("change", () => saveDicePrefs({ public: controls.dicePublic.checked }));
   controls.diceSound?.addEventListener("change", () => saveDicePrefs({ sound: controls.diceSound.checked }));
-  controls.diceColor?.addEventListener("input", () => saveDicePrefs({ color: controls.diceColor.value }));
   controls.diceHistory?.addEventListener("click", (event) => {
     const row = event.target.closest("[data-expr]");
     if (row) rollDice(row.dataset.expr);
@@ -5358,12 +5380,78 @@ function saveDicePrefs(patch) {
   } catch {}
 }
 
+// The dice look chosen in the tray, complete and checked (see LodestarDice.normStyle).
+function diceStyle() {
+  return LodestarDice.normStyle(dice.prefs);
+}
+
+// The "Dice style" section: every change is saved, shown in the controls and the preview, and
+// used for the next roll.
+function setupDiceStyle() {
+  if (!controls.diceStyle) return;
+  const set = (patch) => {
+    saveDicePrefs(patch);
+    syncDiceStyleControls();
+  };
+  controls.diceColor.addEventListener("input", () => set({ color: controls.diceColor.value }));
+  controls.diceInk.addEventListener("input", () => set({ ink: controls.diceInk.value }));
+  controls.diceInkAuto.addEventListener("click", () => set({ ink: "" }));
+  controls.diceSize.addEventListener("input", () => set({ size: Number(controls.diceSize.value) / 100 }));
+  controls.diceFinish.addEventListener("change", () => set({ finish: controls.diceFinish.value }));
+  controls.diceFont.addEventListener("change", () => set({ font: controls.diceFont.value }));
+  controls.diceEffect.addEventListener("change", () => set({ effect: controls.diceEffect.value }));
+  controls.diceCrits.addEventListener("change", () => set({ crits: controls.diceCrits.checked }));
+  controls.dicePresets.addEventListener("click", (event) => {
+    const preset = DICE_PRESETS[event.target.closest("[data-preset]")?.dataset.preset];
+    if (preset) set(preset);
+  });
+  controls.diceStyleReset.addEventListener("click", () => set({ ...LodestarDice.DEFAULT_STYLE }));
+  controls.diceStyle.addEventListener("toggle", runDicePreview);
+  syncDiceStyleControls();
+}
+
+function syncDiceStyleControls() {
+  const st = diceStyle();
+  controls.diceColor.value = st.color;
+  controls.diceInk.value = LodestarDice.inkOf(st);
+  controls.diceInkAuto.setAttribute("aria-pressed", String(!st.ink));
+  controls.diceSize.value = String(Math.round(st.size * 100));
+  controls.diceSizeOut.value = `${Math.round(st.size * 100)}%`;
+  controls.diceFinish.value = st.finish;
+  controls.diceFont.value = st.font;
+  controls.diceEffect.value = st.effect;
+  controls.diceCrits.checked = st.crits;
+  controls.diceStyle.style.setProperty("--dice-swatch", st.color);
+  controls.dicePresets.querySelectorAll("[data-preset]").forEach((button) => {
+    const preset = DICE_PRESETS[button.dataset.preset];
+    button.setAttribute("aria-pressed", String(Object.keys(preset).every((k) => st[k] === preset[k])));
+  });
+}
+
+// While the style section is open (and the tray is), the preview dice turn slowly, ~30 fps.
+function runDicePreview() {
+  cancelAnimationFrame(dice.previewRaf);
+  if (!dice.preview) return;
+  let last = 0;
+  const tick = (now) => {
+    if (!controls.diceStyle.open || controls.dicePanel.classList.contains("hidden")) return;
+    dice.previewRaf = requestAnimationFrame(tick);
+    if (now - last < 33) return;
+    last = now;
+    dice.preview.preview(diceStyle(), now);
+  };
+  dice.previewRaf = requestAnimationFrame(tick);
+}
+
 function toggleDicePanel(force) {
   if (!controls.dicePanel) return;
   const open = force ?? controls.dicePanel.classList.contains("hidden");
   controls.dicePanel.classList.toggle("hidden", !open);
   controls.diceToggle?.setAttribute("aria-expanded", String(open));
-  if (open) controls.diceExpr?.focus();
+  if (open) {
+    controls.diceExpr?.focus();
+    if (controls.diceStyle?.open) runDicePreview();
+  }
 }
 
 function showDiceError(message) {
@@ -5459,7 +5547,7 @@ function rollDice(exprOverride) {
   if (exprOverride !== undefined) controls.diceExpr.value = exprOverride;
   let roll;
   try {
-    roll = LodestarDice.createRoll(controls.diceExpr.value.trim() || "1d20", { color: dice.prefs.color });
+    roll = LodestarDice.createRoll(controls.diceExpr.value.trim() || "1d20", { style: diceStyle() });
   } catch (error) {
     showDiceError(error.message);
     return;

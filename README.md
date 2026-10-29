@@ -74,7 +74,7 @@ Prefer to run it offline? [Download the latest release](https://github.com/Uncle
 - **Movement**: step a selected token with its pop-out arrows or the arrow keys; the path and distance are traced (5e alternating diagonals).
 - **Initiative tracker**: turn order, rounds, HP bars, damage and healing, and a **C** toggle for concentration. Link a row to a token for a turn ring and a GM-only HP bar. A compact order overlay can sit on your screen, the players', or both.
 - **Areas of effect**: circle, square and cone templates in any colour and size, live on both screens. Click to pin one as a marker (Grease, Wall of Fire…) with an optional label.
-- **3D dice roller**: build a roll on the pad (click a die to add it, right-click to take one off, **Clear** to start again) or type it: `1d20+5`, `4d6dl1`, `2d20kh1`, `d%`. One click for advantage or disadvantage. The dice really tumble and settle; tick *Players see the roll* to throw the very same dice on the player display, or keep it a secret GM roll.
+- **3D dice roller**: build a roll on the pad (click a die to add it, right-click to take one off, **Clear** to start again) or type it: `1d20+5`, `4d6dl1`, `2d20kh1`, `d%`. One click for advantage or disadvantage. The dice really tumble and settle; tick *Players see the roll* to throw the very same dice on the player display, or keep it a secret GM roll. Style your dice with a live preview: colour, number colour, size, finish (satin, matte, glossy, metal, glass), font, and a glow, trail or sparks, plus a gold burst on a natural 20.
 - **Measure** in feet or metres, and **ping** any spot with Alt+click.
 
 ### At the table
