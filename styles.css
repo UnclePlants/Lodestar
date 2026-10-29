@@ -1042,6 +1042,8 @@ input:disabled {
   display: none;
 }
 
+/* The toolbar and its popovers sit one layer above the initiative overlay (6), so a tall
+   popover (the selected-token editor) is never covered by the turn order. */
 .stage-controls {
   align-items: start;
   display: flex;
@@ -1050,7 +1052,7 @@ input:disabled {
   left: 30px;
   position: absolute;
   top: 14px;
-  z-index: 6;
+  z-index: 7;
 }
 
 .mode-hint-bar {
@@ -1883,6 +1885,22 @@ input:disabled {
   stroke-linejoin: round;
   stroke-width: 2;
   width: 16px;
+}
+
+/* "Roll initiative": a lime d20 that stands apart from the turn arrows. */
+#initRollAll {
+  color: var(--accent);
+}
+
+#initRollAll svg {
+  height: 19px;
+  stroke-width: 1.4;
+  width: 19px;
+}
+
+#initRollAll .d20-icon path:nth-child(2) {
+  fill: currentColor;
+  fill-opacity: 0.22;
 }
 
 .init-list {
@@ -3092,6 +3110,141 @@ input:disabled {
 .dice-result-expr {
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+/* Whose roll it is ("Goblin · Scimitar", "Initiative"). */
+.dice-result-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Several results at once (initiative): name and number, wrapping. */
+.dice-result-items {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.95rem;
+  gap: 4px 16px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.dice-result-items b {
+  color: var(--accent);
+  font-family: Garamond, "EB Garamond", Georgia, serif;
+  font-size: 1.35rem;
+}
+
+.dice-history-label {
+  color: var(--muted);
+  display: block;
+  font-size: 0.72rem;
+}
+
+/* The selected token's saved rolls, at the top of the dice tray. */
+.dice-token-rolls {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-bottom: 8px;
+}
+
+.dice-token-rolls[hidden] {
+  display: none;
+}
+
+.dice-token-name {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.dice-token-rolls button {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-size: 0.8rem;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+/* Saved rolls in the selected-token editor. */
+.token-rolls {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.token-rolls-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.token-roll-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.token-roll-list .hint {
+  margin: 0;
+}
+
+.token-roll {
+  display: inline-flex;
+}
+
+.token-roll button {
+  font-size: 0.78rem;
+  min-height: 28px;
+}
+
+.token-roll-go {
+  align-items: baseline;
+  border-bottom-right-radius: 0;
+  border-color: var(--accent);
+  border-top-right-radius: 0;
+  display: inline-flex;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.token-roll-go em {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.token-roll-del {
+  border-bottom-left-radius: 0;
+  border-left: 0;
+  border-top-left-radius: 0;
+  color: var(--muted);
+  padding: 0 7px;
+}
+
+.token-roll-del:hover {
+  color: var(--danger);
+}
+
+.token-roll-add {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto;
+}
+
+.token-roll-add input {
+  min-width: 0;
+}
+
+.token-roll-add button {
+  min-height: 0;
+  padding: 0 10px;
 }
 
 .dice-result-detail,
