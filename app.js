@@ -283,6 +283,23 @@ const bedControls = {
 };
 
 const isPlayer = new URLSearchParams(window.location.search).get("view") === "player";
+// Pairing: every Lodestar tab hears the same BroadcastChannel, so each GM tab has an id (kept
+// for the tab's lifetime, reloads included) that it gives the player display it opens, and
+// both sides ignore messages from another pair. Another open Lodestar tab then can't answer
+// this player's "player-ready" with its own (maybe empty) map. A player opened by hand, with
+// no id, still follows any GM.
+const GM_ID = isPlayer ? "" : tabGmId();
+const PAIRED_GM = isPlayer ? new URLSearchParams(window.location.search).get("gm") || "" : "";
+function tabGmId() {
+  let id = "";
+  try {
+    id = sessionStorage.getItem("lodestar.gmId") || "";
+    if (!id) sessionStorage.setItem("lodestar.gmId", (id = Math.random().toString(36).slice(2, 10)));
+  } catch {
+    id = Math.random().toString(36).slice(2, 10);
+  }
+  return id;
+}
 const DEFAULT_GM_FOG_OPACITY = 0.3;
 const INITIAL_FLOOR_ID = "floor-1";
 
@@ -455,6 +472,8 @@ let pendingPlayerMusic = null; // { bed, message } deferred until the player unl
 
 function handleMessage(message, source) {
   if (!message || typeof message !== "object") return;
+  // Another GM/player pair's message (see GM_ID).
+  if (isPlayer ? PAIRED_GM && message.gm !== PAIRED_GM : message.gm && message.gm !== GM_ID) return;
   if (message.mid) {
     if (seenMids.includes(message.mid)) return;
     seenMids.push(message.mid);
@@ -552,6 +571,7 @@ function reportPlayerViewport() {
 // the direct postMessage reaches the opener/popup even when BroadcastChannel does not.
 function relay(message) {
   message.mid = uuid();
+  message.gm = isPlayer ? PAIRED_GM : GM_ID;
   try {
     channel.postMessage(message);
   } catch {}
@@ -1567,8 +1587,9 @@ function bindControls() {
       c.hp = event.target.value === "" ? null : Math.max(0, Number(event.target.value) || 0);
       if (c.hp != null && (c.maxHp == null || c.hp > c.maxHp)) c.maxHp = c.hp;
     } else if (event.target.matches("[data-field='init']")) {
+      const currentId = currentTurnCombatantId();
       c.init = Number(event.target.value) || 0;
-      clampInitiativeTurn();
+      keepTurnOn(currentId);
     }
     updateInitiativeUI();
     broadcastState();
@@ -1722,7 +1743,7 @@ function uuid() {
 }
 
 function openPlayerWindow() {
-  const url = `${location.pathname}?view=player`;
+  const url = `${location.pathname}?view=player&gm=${GM_ID}`;
   playerWindow = window.open(url, "fog-table-player", "popup=yes,width=1280,height=720");
   // The new window announces itself with "player-ready"; we answer with assets + state then.
 }
@@ -2772,6 +2793,8 @@ function sanitizedState() {
   const clone = JSON.parse(JSON.stringify(rest));
   if (clone.splash) delete clone.splash.imageData;
   delete clone.notes; // floating notes are GM-only and never leave the GM window
+  // Handouts the GM hasn't shown yet stay behind (the player wouldn't draw them anyway).
+  if (clone.images) clone.images = clone.images.filter((im) => im.showPlayers);
   // Hidden (stealth) tokens never leave the GM window either, and token notes are GM-only.
   if (clone.tokens) {
     // GM-only conditions stay behind too.
@@ -4829,7 +4852,11 @@ function normalizeNote(note) {
 
 function addNoteAt(native) {
   pushHistory();
-  const note = { id: uuid(), x: native.x, y: native.y, w: NOTE_DEFAULT_CELLS * gridCellNative(), html: "", font: NOTE_FONTS };
+  // Text sized to the grid square (15 px on a 70 px square), so a note on a high-resolution map
+  // reads like one on any other; kept on the note so a later grid change doesn't reflow it.
+  const cell = gridCellNative();
+  const fontPx = Math.round(Math.min(60, Math.max(10, (NOTE_BASE_FONT * cell) / 70)));
+  const note = { id: uuid(), x: native.x, y: native.y, w: NOTE_DEFAULT_CELLS * cell, html: "", font: NOTE_FONTS, fontPx };
   state.notes.push(note);
   render();
   // Focus the freshly created note's body for immediate typing.
@@ -4872,7 +4899,7 @@ function syncNoteLayer() {
     el.style.transform = `translate(${s.x}px, ${s.y}px) scale(${vs})`;
     el.style.width = `${note.w}px`;
     el.style.fontFamily = note.font || NOTE_FONTS;
-    el.style.fontSize = `${NOTE_BASE_FONT * (note.size || 1)}px`;
+    el.style.fontSize = `${(note.fontPx || NOTE_BASE_FONT) * (note.size || 1)}px`;
     const body = el._body;
     // Only rewrite content when it changed externally (e.g. undo) and isn't being edited,
     // so the caret never jumps mid-typing.
@@ -4888,7 +4915,7 @@ function createNoteEl(note) {
   const el = document.createElement("div");
   el.className = "map-note";
   el.dataset.id = note.id;
-  el.style.fontSize = `${NOTE_BASE_FONT}px`;
+  el.style.fontSize = `${note.fontPx || NOTE_BASE_FONT}px`;
   el.innerHTML =
     '<div class="map-note-grip" title="Drag to move"><span class="map-note-dots">::</span>' +
     '<button type="button" class="map-note-del" title="Delete note" aria-label="Delete note">&times;</button></div>' +
@@ -5010,7 +5037,7 @@ function setupNoteFormatBar() {
     if (!activeNote) return;
     activeNote.size = Number(controls.noteSizeSel.value) || 1;
     const el = noteEls.get(activeNote.id);
-    if (el) el.style.fontSize = `${NOTE_BASE_FONT * activeNote.size}px`;
+    if (el) el.style.fontSize = `${(activeNote.fontPx || NOTE_BASE_FONT) * activeNote.size}px`;
   });
 }
 
@@ -5371,6 +5398,16 @@ function clampInitiativeTurn() {
   state.initiative.turn = n ? Math.min(Math.max(0, state.initiative.turn), n - 1) : 0;
 }
 
+// The order re-sorts when someone joins, leaves or gets a new initiative; the turn stays with
+// whoever had it (`id`), unless the fight hasn't started yet (then it's the top of the order).
+function keepTurnOn(id) {
+  const init = state.initiative;
+  if (init.round === 1 && init.turn === 0) return clampInitiativeTurn();
+  const i = id ? sortedCombatants().findIndex((c) => c.id === id) : -1;
+  if (i >= 0) init.turn = i;
+  clampInitiativeTurn();
+}
+
 // Collapse/expand the left control panel. The grid column width animates in CSS; the
 // canvas ResizeObserver re-measures the stage as it grows/shrinks.
 function togglePanelCollapsed() {
@@ -5446,7 +5483,9 @@ function addCombatant() {
   if (init.mod != null) combatant.initMod = init.mod;
   if (init.formula) combatant.initFormula = init.formula;
   if (hpRoll.formula) combatant.hpFormula = hpRoll.formula;
+  const currentId = currentTurnCombatantId();
   state.initiative.combatants.push(combatant);
+  keepTurnOn(currentId);
   controls.initName.value = "";
   controls.initRoll.value = "";
   controls.initHp.value = "";
@@ -5503,8 +5542,15 @@ function rollGroupInitiative() {
 function removeCombatant(id) {
   clearCombatantLinks(id); // drop any token's link to this combatant
   if (linkingCombatantId === id) exitLinkMode();
+  let keep = currentTurnCombatantId();
+  if (keep === id) {
+    // Removing whoever's turn it is passes it to the next in line.
+    const order = sortedCombatants();
+    const at = order.findIndex((c) => c.id === id);
+    keep = order.length > 1 ? order[(at + 1) % order.length].id : null;
+  }
   state.initiative.combatants = state.initiative.combatants.filter((c) => c.id !== id);
-  clampInitiativeTurn();
+  keepTurnOn(keep);
   updateInitiativeUI();
   broadcastState();
 }
@@ -5722,6 +5768,13 @@ function renderInitiativePanel() {
     .join("");
   if (!list.length) {
     controls.initList.innerHTML = '<p class="hint">No characters yet. Add one below.</p>';
+  }
+  // A long order scrolls on its own; keep whoever's turn it is in view.
+  const current = controls.initList.querySelector(".init-row.current");
+  if (current) {
+    const box = controls.initList;
+    if (current.offsetTop < box.scrollTop) box.scrollTop = current.offsetTop;
+    else if (current.offsetTop + current.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = current.offsetTop + current.offsetHeight - box.clientHeight;
   }
 }
 
@@ -6790,7 +6843,8 @@ function measureLabelText(start, end) {
   const unit = MEASURE_UNITS[state.measure.unit] || MEASURE_UNITS.imperial;
   const dist = cells * unit.perCell;
   const distStr = state.measure.unit === "metric" ? dist.toFixed(1) : String(Math.round(dist));
-  return `${cells.toFixed(1)} cells · ${distStr} ${unit.label}`;
+  // Straight-line, so it can be a fraction of a square ("7.1 sq"); whole ones read like the move label.
+  return `${cells.toFixed(1).replace(/\.0$/, "")} sq · ${distStr} ${unit.label}`;
 }
 
 // Screen-space distance label centred on a native segment (called after the map transform).
@@ -6980,19 +7034,7 @@ function onPointerDown(event) {
       render();
       return;
     }
-    const image = hitImage(native);
-    if (image) {
-      pushHistory();
-      selectedImage = image;
-      selectedToken = selectedNote = selectedAoeMarker = null;
-      draggingImage = image;
-      dragGrab = { dx: image.x - native.x, dy: image.y - native.y };
-      isDragging = true;
-      capturePointer(event.pointerId);
-      updateSelectionPanels();
-      render();
-      return;
-    }
+    // Stairs and spell areas are drawn above handouts, so they're picked first.
     const stair = hitStair(native);
     if (stair) {
       const idx = state.floors.findIndex((f) => f.id === stair.targetFloorId);
@@ -7004,6 +7046,19 @@ function onPointerDown(event) {
       selectedAoeMarker = aoeMarker;
       selectedToken = selectedImage = selectedNote = null;
       tokenPath = null;
+      updateSelectionPanels();
+      render();
+      return;
+    }
+    const image = hitImage(native);
+    if (image) {
+      pushHistory();
+      selectedImage = image;
+      selectedToken = selectedNote = selectedAoeMarker = null;
+      draggingImage = image;
+      dragGrab = { dx: image.x - native.x, dy: image.y - native.y };
+      isDragging = true;
+      capturePointer(event.pointerId);
       updateSelectionPanels();
       render();
       return;
@@ -7272,7 +7327,7 @@ function onDoubleClick(event) {
     return;
   }
   const native = toNativePoint(event);
-  const aoeMarker = hitAoeMarker(native);
+  const aoeMarker = hitToken(native) ? null : hitAoeMarker(native); // not through a token standing in it
   if (aoeMarker) {
     editAoeMarkerLabel(aoeMarker);
     return;
@@ -7284,6 +7339,11 @@ function onContextMenu(event) {
   if (isPlayer) return;
   event.preventDefault();
   const native = toNativePoint(event);
+  // As with a left click, a token (or stair) wins over the spell area it stands in.
+  if (hitStair(native) || hitToken(native)) {
+    deleteTokenOrRoom(native);
+    return;
+  }
   const aoeMarker = hitAoeMarker(native);
   if (aoeMarker) {
     pushHistory();
@@ -7313,8 +7373,19 @@ function onKeyDown(event) {
     toggleDicePanel(false);
     return;
   }
-  if (event.target?.matches?.("input, button, textarea, select")) return;
-  if (event.target?.isContentEditable) return; // typing in a note shouldn't trigger tool keys
+  // Typing goes to the field; a focused button, checkbox or slider keeps only the keys it uses
+  // (so after clicking, say, Fit, the tool keys still work).
+  // A dialog (library, naming…) has the keys; "?" still closes the shortcut sheet.
+  const openDialog = document.querySelector("dialog[open]");
+  if (openDialog) {
+    if (event.key === "?" && openDialog === controls.shortcutsDialog) openShortcuts();
+    return;
+  }
+  const target = event.target;
+  if (target?.matches?.("textarea, select, input:not([type=button], [type=checkbox], [type=radio], [type=range], [type=color], [type=file])")) return;
+  if (target?.isContentEditable) return; // typing in a note shouldn't trigger tool keys
+  if (target?.matches?.("button, input, a, summary") && (event.key === "Enter" || event.key === " ")) return;
+  if (target?.matches?.("input[type=range]") && /^(Arrow|Home|End|Page)/.test(event.key)) return;
 
   if (event.key === "?") {
     openShortcuts();
@@ -7419,6 +7490,7 @@ function onKeyDown(event) {
   const shortcuts = { v: "pan", h: "pan", p: "polygon", n: "namedPolygon", b: "brush", e: "eraser", t: "token", a: "aoe", m: "measure", s: "stair" };
   const key = event.key.toLowerCase();
   if (key === "d" && !ctrl && !event.altKey) {
+    event.preventDefault(); // the tray focuses its roll box; don't type this "d" into it
     toggleDicePanel();
     return;
   }
