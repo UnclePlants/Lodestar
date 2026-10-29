@@ -251,6 +251,12 @@ const controls = {
   weatherFlash: document.getElementById("weatherFlash"),
   transitionsEnabled: document.getElementById("transitionsEnabled"),
   sceneFade: document.getElementById("sceneFade"),
+  initRollAll: document.getElementById("initRollAll"),
+  tokenRollList: document.getElementById("tokenRollList"),
+  tokenRollAdd: document.getElementById("tokenRollAdd"),
+  tokenRollName: document.getElementById("tokenRollName"),
+  tokenRollExpr: document.getElementById("tokenRollExpr"),
+  diceTokenRolls: document.getElementById("diceTokenRolls"),
 };
 
 // Per-bed control lookup so the music code can treat the two looping layers identically.
@@ -1484,6 +1490,26 @@ function bindControls() {
     event.preventDefault();
     addCombatant();
   });
+  controls.initRoll?.addEventListener("input", () => controls.initRoll.setCustomValidity(""));
+  controls.initHp?.addEventListener("input", () => controls.initHp.setCustomValidity(""));
+  controls.initRollAll?.addEventListener("click", rollGroupInitiative);
+  // Saved rolls on the selected token (editor list and the dice tray's row).
+  controls.tokenRollAdd?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    addTokenRoll();
+  });
+  controls.tokenRollExpr?.addEventListener("input", () => controls.tokenRollExpr.setCustomValidity(""));
+  controls.tokenRollList?.addEventListener("click", (event) => {
+    const id = event.target.closest("[data-roll]")?.dataset.roll;
+    const act = event.target.closest("[data-act]")?.dataset.act;
+    if (!id) return;
+    if (act === "remove") removeTokenRoll(id);
+    else if (act === "roll") rollTokenRoll(id);
+  });
+  controls.diceTokenRolls?.addEventListener("click", (event) => {
+    const id = event.target.closest("[data-roll]")?.dataset.roll;
+    if (id) rollTokenRoll(id);
+  });
   controls.initList?.addEventListener("click", (event) => {
     const row = event.target.closest("[data-id]");
     if (!row) return;
@@ -2472,7 +2498,7 @@ function sanitizedState() {
   // Hidden (stealth) tokens never leave the GM window either, and token notes are GM-only.
   if (clone.tokens) {
     // eslint-disable-next-line no-unused-vars
-    clone.tokens = clone.tokens.filter((t) => !t.hidden).map(({ note, ...t }) => t);
+    clone.tokens = clone.tokens.filter((t) => !t.hidden).map(({ note, rolls, ...t }) => t);
   }
   // Send only player-visible markers; strip GM-only label field.
   if (clone.aoeMarkers) {
@@ -4059,6 +4085,7 @@ function syncTokenEditor() {
     if (controls.tokenHidden) controls.tokenHidden.checked = !!token.hidden;
   }
   updateTokenImagePreview();
+  renderTokenRolls();
 }
 
 function editSelectedToken() {
@@ -4104,6 +4131,85 @@ function updateTokenNoteTip(event) {
 function nudgeSelectedToken(key) {
   const delta = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[key];
   if (delta) moveSelectedTokenByCell(delta[0], delta[1]);
+}
+
+/* ---- saved rolls on tokens ----
+A token can carry rolls (a name and the dice, e.g. "Scimitar 1d20+4"); they're GM-only and never
+sent to the player display. One click in the token editor, or in the dice tray while the token is
+selected, rolls it with the current dice style, labelled with the token's name. */
+function tokenDisplayName(token) {
+  const c = token.combatantId && state.initiative.combatants.find((x) => x.id === token.combatantId);
+  return c?.name || token.label || "Token";
+}
+
+function renderTokenRolls() {
+  if (!controls.tokenRollList) return;
+  const rolls = editingToken()?.rolls || [];
+  controls.tokenRollList.innerHTML = rolls.length
+    ? rolls
+        .map(
+          (r) => `<span class="token-roll" data-roll="${escapeHtml(r.id)}">
+            <button type="button" class="token-roll-go" data-act="roll" title="Roll ${escapeHtml(r.expr)}"><span>${escapeHtml(r.name)}</span><em>${escapeHtml(r.expr)}</em></button>
+            <button type="button" class="token-roll-del" data-act="remove" title="Remove this roll" aria-label="Remove ${escapeHtml(r.name)}">&times;</button>
+          </span>`,
+        )
+        .join("")
+    : '<p class="hint">Save attacks, damage or saves here to roll them in one click.</p>';
+  renderDiceTokenRolls();
+}
+
+// The dice tray shows the selected token's rolls as a row of buttons.
+function renderDiceTokenRolls() {
+  const el = controls.diceTokenRolls;
+  if (!el) return;
+  const token = editingToken();
+  const rolls = token?.rolls || [];
+  el.hidden = !rolls.length;
+  el.innerHTML = rolls.length
+    ? `<span class="dice-token-name">${escapeHtml(tokenDisplayName(token))}</span>` +
+      rolls.map((r) => `<button type="button" data-roll="${escapeHtml(r.id)}" title="Roll ${escapeHtml(r.expr)}">${escapeHtml(r.name)}</button>`).join("")
+    : "";
+}
+
+function addTokenRoll() {
+  const token = editingToken();
+  if (!token) return;
+  const expr = controls.tokenRollExpr.value.trim();
+  controls.tokenRollExpr.setCustomValidity("");
+  if (!expr) {
+    controls.tokenRollExpr.focus();
+    return;
+  }
+  let normalised;
+  try {
+    normalised = LodestarDice.format(LodestarDice.parse(expr));
+  } catch (error) {
+    controls.tokenRollExpr.setCustomValidity(error.message);
+    controls.tokenRollExpr.reportValidity();
+    return;
+  }
+  pushHistory();
+  if (!token.rolls) token.rolls = [];
+  token.rolls.push({ id: uuid(), name: controls.tokenRollName.value.trim() || normalised, expr: normalised });
+  controls.tokenRollName.value = "";
+  controls.tokenRollExpr.value = "";
+  controls.tokenRollName.focus();
+  renderTokenRolls();
+}
+
+function removeTokenRoll(id) {
+  const token = editingToken();
+  if (!token?.rolls) return;
+  pushHistory();
+  token.rolls = token.rolls.filter((r) => r.id !== id);
+  if (!token.rolls.length) delete token.rolls;
+  renderTokenRolls();
+}
+
+function rollTokenRoll(id) {
+  const token = editingToken();
+  const r = token?.rolls?.find((x) => x.id === id);
+  if (r) rollDice(r.expr, { label: `${tokenDisplayName(token)} · ${r.name}` });
 }
 
 /* ----------------------------- map images & notes ----------------------------- */
@@ -4761,13 +4867,46 @@ function toggleRightPanels() {
   });
 }
 
+// The tracker's Init and HP fields take a number, or something to roll: "+2" or "-1" (for
+// initiative: a d20 plus that), "d20+2", "2d8+2". Returns { value } plus, for initiative, the
+// modifier (mod) or the roll (formula) so "Roll initiative" can roll it again; { error } when it
+// can't be read (shown on the field).
+function readRollField(input, kind) {
+  const text = input.value.trim().replace(/\s+/g, "");
+  input.setCustomValidity("");
+  if (!text) return { value: kind === "hp" ? null : 0 };
+  if (/^\d+$/.test(text)) return { value: Number(text) };
+  if (kind === "init" && /^[+-]\d+$/.test(text)) {
+    const mod = Number(text);
+    return { value: LodestarDice.createRoll("1d20").total + mod, mod };
+  }
+  try {
+    const roll = LodestarDice.createRoll(text);
+    const d20 = kind === "init" ? /^1?d20([+-]\d+)?$/i.exec(text) : null; // "d20+2" is just a modifier
+    const value = kind === "hp" ? Math.max(0, roll.total) : roll.total;
+    return d20 ? { value, mod: Number(d20[1] || 0) } : { value, formula: roll.expr };
+  } catch (error) {
+    input.setCustomValidity(error.message);
+    input.reportValidity();
+    return { error: error.message };
+  }
+}
+
+const signed = (n) => (n < 0 ? `${n}` : `+${n}`);
+
 function addCombatant() {
   const name = controls.initName.value.trim();
   if (!name) return;
-  const init = Number(controls.initRoll.value) || 0;
-  const hp = controls.initHp.value === "" ? null : Math.max(0, Number(controls.initHp.value) || 0);
+  const init = readRollField(controls.initRoll, "init");
+  const hpRoll = readRollField(controls.initHp, "hp");
+  if (init.error || hpRoll.error) return;
+  const hp = hpRoll.value;
   const type = controls.initType.value || "player";
-  state.initiative.combatants.push({ id: uuid(), name, type, init, hp, maxHp: hp, concentration: false });
+  const combatant = { id: uuid(), name, type, init: init.value, hp, maxHp: hp, concentration: false };
+  if (init.mod != null) combatant.initMod = init.mod;
+  if (init.formula) combatant.initFormula = init.formula;
+  if (hpRoll.formula) combatant.hpFormula = hpRoll.formula;
+  state.initiative.combatants.push(combatant);
   controls.initName.value = "";
   controls.initRoll.value = "";
   controls.initHp.value = "";
@@ -4777,6 +4916,47 @@ function addCombatant() {
   } else {
     updateInitiativeUI();
     broadcastState();
+  }
+}
+
+// "Roll initiative": everyone added with a modifier (or a roll) — monsters and NPCs, usually —
+// rolls again, as one throw of d20s that only the GM sees; with nobody set up that way, every
+// NPC and monster rolls a plain d20. Then the order re-sorts: from the top at the start of a
+// fight, otherwise keeping whoever's turn it is.
+function rollGroupInitiative() {
+  const all = state.initiative.combatants;
+  let group = all.filter((c) => c.initMod != null || c.initFormula);
+  if (!group.length) group = all.filter((c) => c.type !== "player");
+  if (!group.length) return;
+  const currentId = currentTurnCombatantId();
+  const startOfFight = state.initiative.round === 1 && state.initiative.turn === 0;
+  const d20s = group.filter((c) => !c.initFormula);
+  let roll = null;
+  try {
+    if (d20s.length) roll = LodestarDice.createRoll(`${d20s.length}d20`, { style: diceStyle() });
+  } catch {
+    roll = null; // more than one throw can hold: roll them quietly instead
+  }
+  const faces = roll ? roll.terms[0].rolls.map((r) => r.value) : d20s.map(() => LodestarDice.createRoll("1d20").total);
+  d20s.forEach((c, i) => (c.init = faces[i] + (c.initMod || 0)));
+  group
+    .filter((c) => c.initFormula)
+    .forEach((c) => {
+      try {
+        c.init = LodestarDice.createRoll(c.initFormula).total;
+      } catch {}
+    });
+  const order = sortedCombatants();
+  state.initiative.turn = startOfFight ? 0 : Math.max(0, order.findIndex((c) => c.id === currentId));
+  updateInitiativeUI();
+  broadcastState();
+  const results = { label: "Initiative", items: order.filter((c) => group.includes(c)).map((c) => ({ name: c.name, value: c.init })), public: false };
+  if (roll) {
+    Object.assign(roll, results);
+    playDiceRoll(roll, dice.prefs.sound !== false);
+  } else {
+    showDiceResult(results);
+    dice.bannerTimer = setTimeout(() => hideDiceResult(), 6000);
   }
 }
 
@@ -4980,7 +5160,7 @@ function renderInitiativePanel() {
           <button type="button" class="init-name" data-act="set-turn" title="Set as current turn">${escapeHtml(c.name)}</button>
           <button type="button" class="init-link${linkState}" data-act="link" title="${linkTitle}" aria-label="${linkTitle}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><line x1="12" x2="12" y1="1" y2="4"/><line x1="12" x2="12" y1="20" y2="23"/><line x1="1" x2="4" y1="12" y2="12"/><line x1="20" x2="23" y1="12" y2="12"/></svg></button>
           <button type="button" class="init-conc${c.concentration ? " active" : ""}" data-act="toggle-conc" title="Concentration" aria-label="Concentration" aria-pressed="${!!c.concentration}">C</button>
-          <input class="init-init" type="number" data-field="init" value="${c.init}" title="Initiative">
+          <input class="init-init" type="number" data-field="init" value="${c.init}" title="Initiative${c.initMod != null ? ` (rolls d20${signed(c.initMod)})` : c.initFormula ? ` (rolls ${escapeHtml(c.initFormula)})` : ""}">
           <button type="button" class="init-remove" data-act="remove" title="Remove" aria-label="Remove">&times;</button>
         </div>
         <div class="init-hp-line">
@@ -5578,7 +5758,7 @@ function setupDice() {
   controls.diceSound?.addEventListener("change", () => saveDicePrefs({ sound: controls.diceSound.checked }));
   controls.diceHistory?.addEventListener("click", (event) => {
     const row = event.target.closest("[data-expr]");
-    if (row) rollDice(row.dataset.expr);
+    if (row) rollDice(row.dataset.expr, { label: row.dataset.label || undefined });
   });
   updateDicePad();
 }
@@ -5660,6 +5840,7 @@ function toggleDicePanel(force) {
   controls.diceToggle?.setAttribute("aria-expanded", String(open));
   if (open) {
     controls.diceExpr?.focus();
+    renderDiceTokenRolls();
     if (controls.diceStyle?.open) runDicePreview();
   }
 }
@@ -5752,7 +5933,8 @@ function withAdvantage(mode) {
   return LodestarDice.format(terms);
 }
 
-function rollDice(exprOverride) {
+// opts.label names the roll in the banner and history, e.g. "Goblin · Scimitar".
+function rollDice(exprOverride, opts = {}) {
   if (!dice.stage) return;
   if (exprOverride !== undefined) controls.diceExpr.value = exprOverride;
   let roll;
@@ -5766,7 +5948,8 @@ function rollDice(exprOverride) {
   controls.diceExpr.value = roll.expr; // normalised, e.g. "d20 + 5" -> "1d20+5"
   updateDicePad();
   roll.public = !!dice.prefs.public;
-  dice.history.unshift({ expr: roll.expr, total: roll.total, detail: diceDetailHtml(roll), public: roll.public });
+  if (opts.label) roll.label = String(opts.label).slice(0, 60);
+  dice.history.unshift({ expr: roll.expr, total: roll.total, detail: diceDetailHtml(roll), public: roll.public, label: roll.label || "" });
   dice.history.length = Math.min(dice.history.length, 12);
   renderDiceHistory();
   playDiceRoll(roll, dice.prefs.sound !== false);
@@ -5800,10 +5983,18 @@ function showDiceResult(roll) {
   if (!el) return;
   clearTimeout(dice.bannerTimer);
   const secret = !isPlayer && !roll.public ? '<span class="dice-secret">GM only</span>' : "";
-  el.innerHTML =
-    `<div class="dice-result-total">${Number(roll.total)}</div>` +
-    `<div class="dice-result-expr">${escapeHtml(roll.expr)}${secret}</div>` +
-    `<div class="dice-result-detail">${diceDetailHtml(roll)}</div>`;
+  const label = roll.label ? `<div class="dice-result-label">${escapeHtml(roll.label)}</div>` : "";
+  // A list of results (e.g. initiative: "Goblin 17 · Wolf 9") instead of one total.
+  if (Array.isArray(roll.items)) {
+    const items = roll.items.map((it) => `<span>${escapeHtml(it.name)} <b>${Number(it.value)}</b></span>`).join("");
+    el.innerHTML = `${label}<div class="dice-result-items">${items}</div>${secret ? `<div class="dice-result-expr">${secret}</div>` : ""}`;
+  } else {
+    el.innerHTML =
+      label +
+      `<div class="dice-result-total">${Number(roll.total)}</div>` +
+      `<div class="dice-result-expr">${escapeHtml(roll.expr)}${secret}</div>` +
+      `<div class="dice-result-detail">${diceDetailHtml(roll)}</div>`;
+  }
   el.classList.remove("fading");
   el.hidden = false;
 }
@@ -5827,8 +6018,8 @@ function renderDiceHistory() {
   if (!controls.diceHistory) return;
   controls.diceHistory.innerHTML = dice.history
     .map(
-      (h) => `<li data-expr="${escapeHtml(h.expr)}" title="Roll ${escapeHtml(h.expr)} again">
-        <span class="dice-history-expr">${escapeHtml(h.expr)}${h.public ? "" : ' <span class="dice-secret">GM</span>'}</span>
+      (h) => `<li data-expr="${escapeHtml(h.expr)}" data-label="${escapeHtml(h.label || "")}" title="Roll ${escapeHtml(h.expr)} again">
+        <span class="dice-history-expr">${h.label ? `<span class="dice-history-label">${escapeHtml(h.label)}</span>` : ""}${escapeHtml(h.expr)}${h.public ? "" : ' <span class="dice-secret">GM</span>'}</span>
         <span class="dice-history-total">${Number(h.total)}</span>
         <span class="dice-history-detail">${h.detail}</span>
       </li>`,
