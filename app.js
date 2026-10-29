@@ -257,6 +257,9 @@ const controls = {
   tokenRollName: document.getElementById("tokenRollName"),
   tokenRollExpr: document.getElementById("tokenRollExpr"),
   diceTokenRolls: document.getElementById("diceTokenRolls"),
+  conditionSystem: document.getElementById("conditionSystem"),
+  tokenCondList: document.getElementById("tokenCondList"),
+  tokenCondAdd: document.getElementById("tokenCondAdd"),
 };
 
 // Per-bed control lookup so the music code can treat the two looping layers identically.
@@ -346,6 +349,9 @@ const state = {
   // Player display fades: revealed fog fades away, and a map/floor/screen change fades
   // through black (see "scene fades").
   transitions: true,
+  // Which game's conditions the token editor lists: "dnd5e" or "pf2e" (a GM preference,
+  // remembered per browser; see "conditions").
+  conditionSystem: "dnd5e",
   // Views carry a rotation (degrees) so the map can be re-oriented. The GM "rotate map"
   // drives view.rotation; the player can be rotated independently via playerView.rotation.
   view: { scale: 1, cx: 0, cy: 0, rotation: 0 },
@@ -1510,6 +1516,23 @@ function bindControls() {
     const id = event.target.closest("[data-roll]")?.dataset.roll;
     if (id) rollTokenRoll(id);
   });
+  // Conditions on the selected token, and which game's list to use.
+  try {
+    if (localStorage.getItem(CONDITION_SYSTEM_KEY) === "pf2e") state.conditionSystem = "pf2e";
+  } catch {}
+  controls.conditionSystem?.addEventListener("change", () => setConditionSystem(controls.conditionSystem.value));
+  controls.tokenCondAdd?.addEventListener("change", () => {
+    if (controls.tokenCondAdd.value) addTokenCondition(controls.tokenCondAdd.value);
+  });
+  controls.tokenCondList?.addEventListener("click", (event) => {
+    const id = event.target.closest("[data-cond]")?.dataset.cond;
+    const act = event.target.closest("button[data-act]")?.dataset.act;
+    if (id && act) changeTokenCondition(id, act);
+  });
+  controls.tokenCondList?.addEventListener("change", (event) => {
+    const id = event.target.closest("[data-cond]")?.dataset.cond;
+    if (id && event.target.matches(".token-cond-rounds")) changeTokenCondition(id, "rounds", event.target);
+  });
   controls.initList?.addEventListener("click", (event) => {
     const row = event.target.closest("[data-id]");
     if (!row) return;
@@ -2046,6 +2069,8 @@ function loadSnapshot(snapshot) {
   if (snapshot.measure) Object.assign(state.measure, snapshot.measure);
   if (window.LodestarWeather) state.weather = LodestarWeather.normWeather(snapshot.weather); // none if the map has none
   state.transitions = snapshot.transitions !== false;
+  // The GM keeps their own condition system; the player follows the GM's.
+  if (isPlayer) state.conditionSystem = snapshot.conditionSystem === "pf2e" ? "pf2e" : "dnd5e";
   if (snapshot.initiative) {
     state.initiative = { active: false, showPlayers: false, showOverlay: true, round: 1, turn: 0, combatants: [], ...snapshot.initiative };
   }
@@ -2497,8 +2522,11 @@ function sanitizedState() {
   delete clone.notes; // floating notes are GM-only and never leave the GM window
   // Hidden (stealth) tokens never leave the GM window either, and token notes are GM-only.
   if (clone.tokens) {
-    // eslint-disable-next-line no-unused-vars
-    clone.tokens = clone.tokens.filter((t) => !t.hidden).map(({ note, rolls, ...t }) => t);
+    // GM-only conditions stay behind too.
+    clone.tokens = clone.tokens
+      .filter((t) => !t.hidden)
+      // eslint-disable-next-line no-unused-vars
+      .map(({ note, rolls, ...t }) => (t.conditions ? { ...t, conditions: t.conditions.filter((c) => !c.gm) } : t));
   }
   // Send only player-visible markers; strip GM-only label field.
   if (clone.aoeMarkers) {
@@ -3865,6 +3893,7 @@ function drawTokens() {
       const c = combatantById[token.combatantId];
       if (c && c.maxHp > 0 && c.hp != null) drawTokenHpBar(token, r, c);
     }
+    drawTokenConditions(token, r);
     ctx.restore();
   });
 }
@@ -4085,6 +4114,7 @@ function syncTokenEditor() {
     if (controls.tokenHidden) controls.tokenHidden.checked = !!token.hidden;
   }
   updateTokenImagePreview();
+  renderTokenConditions();
   renderTokenRolls();
 }
 
@@ -4111,7 +4141,9 @@ let tokenNoteTip = null;
 
 function updateTokenNoteTip(event) {
   const token = event && mode === "pan" && !isDragging ? hitToken(toNativePoint(event)) : null;
-  const text = token?.note || "";
+  // Its conditions spelled out ("Frightened 2 · Prone (3 rnd)"), then the GM's note.
+  const conditions = token ? activeConditions(token).map(conditionLabel).join(" · ") : "";
+  const text = [conditions, token?.note || ""].filter(Boolean).join("\n");
   if (!text) {
     if (tokenNoteTip) tokenNoteTip.hidden = true;
     return;
@@ -4210,6 +4242,262 @@ function rollTokenRoll(id) {
   const token = editingToken();
   const r = token?.rolls?.find((x) => x.id === id);
   if (r) rollDice(r.expr, { label: `${tokenDisplayName(token)} · ${r.name}` });
+}
+
+/* ---- conditions ----
+Tokens carry conditions from D&D 5e or Pathfinder 2e (the GM picks which list, for every token;
+remembered per browser). Each shows as a small coloured badge with a short code around the
+token's edge, on the GM screen and the player display. A condition can have a value (PF2e's
+Frightened 2, 5e's exhaustion level), a number of rounds (counted by the initiative tracker's
+rounds; it drops off when they run out), and can be GM-only (never sent to the player).
+token.conditions: [{ id, value?, until? (the last round it lasts), gm? }] */
+const CONDITION_SYSTEM_KEY = "lodestar.conditionSystem";
+// Badge colours by kind: mind, senses, movement, out of action, body, unseen, exposed, faster.
+const COND_COLORS = { mind: "#c9609f", senses: "#8f78cf", move: "#d98a32", out: "#c64c45", body: "#4f9f57", unseen: "#4b95c9", exposed: "#c9a93a", boost: "#2fa89a" };
+const CONDITIONS = {
+  dnd5e: [
+    ["blinded", "Blinded", "Bl", "senses"],
+    ["charmed", "Charmed", "Ch", "mind"],
+    ["deafened", "Deafened", "De", "senses"],
+    ["exhaustion", "Exhaustion", "Ex", "body", 6],
+    ["frightened", "Frightened", "Fr", "mind"],
+    ["grappled", "Grappled", "Gr", "move"],
+    ["incapacitated", "Incapacitated", "In", "out"],
+    ["invisible", "Invisible", "Iv", "unseen"],
+    ["paralyzed", "Paralyzed", "Pa", "out"],
+    ["petrified", "Petrified", "Pe", "out"],
+    ["poisoned", "Poisoned", "Po", "body"],
+    ["prone", "Prone", "Pr", "move"],
+    ["restrained", "Restrained", "Re", "move"],
+    ["stunned", "Stunned", "St", "out"],
+    ["unconscious", "Unconscious", "Un", "out"],
+  ],
+  pf2e: [
+    ["blinded", "Blinded", "Bl", "senses"],
+    ["clumsy", "Clumsy", "Cl", "body", 9],
+    ["concealed", "Concealed", "Cc", "unseen"],
+    ["confused", "Confused", "Cf", "mind"],
+    ["controlled", "Controlled", "Ct", "mind"],
+    ["dazzled", "Dazzled", "Dz", "senses"],
+    ["deafened", "Deafened", "De", "senses"],
+    ["doomed", "Doomed", "Do", "out", 9],
+    ["drained", "Drained", "Dr", "body", 9],
+    ["dying", "Dying", "Dy", "out", 4],
+    ["encumbered", "Encumbered", "En", "move"],
+    ["enfeebled", "Enfeebled", "Ef", "body", 9],
+    ["fascinated", "Fascinated", "Fa", "mind"],
+    ["fatigued", "Fatigued", "Ft", "body"],
+    ["fleeing", "Fleeing", "Fl", "mind"],
+    ["frightened", "Frightened", "Fr", "mind", 9],
+    ["grabbed", "Grabbed", "Gb", "move"],
+    ["hidden", "Hidden", "Hi", "unseen"],
+    ["immobilized", "Immobilized", "Im", "move"],
+    ["invisible", "Invisible", "Iv", "unseen"],
+    ["off-guard", "Off-Guard", "OG", "exposed"],
+    ["paralyzed", "Paralyzed", "Pa", "out"],
+    ["persistent", "Persistent damage", "PD", "out", 99],
+    ["petrified", "Petrified", "Pe", "out"],
+    ["prone", "Prone", "Pr", "move"],
+    ["quickened", "Quickened", "Qu", "boost"],
+    ["restrained", "Restrained", "Re", "move"],
+    ["sickened", "Sickened", "Si", "body", 9],
+    ["slowed", "Slowed", "Sl", "move", 9],
+    ["stunned", "Stunned", "St", "out", 9],
+    ["stupefied", "Stupefied", "Su", "mind", 9],
+    ["unconscious", "Unconscious", "Un", "out"],
+    ["undetected", "Undetected", "Ud", "unseen"],
+    ["wounded", "Wounded", "Wo", "out", 9],
+  ],
+};
+const CONDITION_DEFS = {};
+Object.entries(CONDITIONS).forEach(([system, list]) => {
+  CONDITION_DEFS[system] = {};
+  list.forEach(([id, name, abbr, kind, max]) => (CONDITION_DEFS[system][id] = { id, name, abbr, color: COND_COLORS[kind], max: max || 0 }));
+});
+
+// A condition's definition in the current system, else the other one (a token keeps conditions
+// added under the other list).
+function conditionDef(id) {
+  const other = state.conditionSystem === "pf2e" ? "dnd5e" : "pf2e";
+  return CONDITION_DEFS[state.conditionSystem]?.[id] || CONDITION_DEFS[other][id] || null;
+}
+
+const conditionExpired = (c) => c.until != null && c.until < state.initiative.round;
+
+// The conditions to draw on a token here (GM-only ones never reach the player anyway).
+function activeConditions(token) {
+  return (token.conditions || []).filter((c) => conditionDef(c.id) && !conditionExpired(c) && (!isPlayer || !c.gm));
+}
+
+function conditionLabel(c) {
+  const def = conditionDef(c.id);
+  const left = c.until != null ? c.until - state.initiative.round + 1 : 0;
+  const notes = [left > 0 ? `${left} rnd` : "", c.gm ? "GM only" : ""].filter(Boolean).join(", ");
+  return `${def.name}${c.value ? ` ${c.value}` : ""}${notes ? ` (${notes})` : ""}`;
+}
+
+function setConditionSystem(system) {
+  state.conditionSystem = system === "pf2e" ? "pf2e" : "dnd5e";
+  try {
+    localStorage.setItem(CONDITION_SYSTEM_KEY, state.conditionSystem);
+  } catch {}
+  renderTokenConditions();
+  renderAndSync();
+  updateInitiativeUI();
+}
+
+function renderTokenConditions() {
+  if (!controls.tokenCondList) return;
+  const token = editingToken();
+  if (controls.conditionSystem) controls.conditionSystem.value = state.conditionSystem;
+  const list = (token?.conditions || []).filter((c) => conditionDef(c.id));
+  controls.tokenCondList.innerHTML = list
+    .map((c) => {
+      const def = conditionDef(c.id);
+      const left = c.until != null ? Math.max(0, c.until - state.initiative.round + 1) : "";
+      const value = def.max
+        ? `<span class="token-cond-value"><button type="button" data-act="dec" aria-label="Lower">&minus;</button><b>${Number(c.value) || 1}</b><button type="button" data-act="inc" aria-label="Raise">+</button></span>`
+        : "";
+      return `<div class="token-cond" data-cond="${escapeHtml(c.id)}">
+        <span class="cond-badge" style="--cond:${def.color}">${escapeHtml(def.abbr)}</span>
+        <span class="token-cond-name" title="${escapeHtml(def.name)}">${escapeHtml(def.name)}</span>
+        ${value}
+        <input class="token-cond-rounds" type="number" min="0" max="99" value="${left}" placeholder="∞" title="Rounds left (empty: until you remove it)" aria-label="Rounds left">
+        <button type="button" class="token-cond-gm" data-act="gm" aria-pressed="${!!c.gm}" title="GM only: players don't see this one">GM</button>
+        <button type="button" class="token-cond-remove" data-act="remove" title="Remove" aria-label="Remove ${escapeHtml(def.name)}">&times;</button>
+      </div>`;
+    })
+    .join("");
+  // The add menu lists this system's conditions the token doesn't have yet.
+  if (controls.tokenCondAdd) {
+    const have = new Set(list.map((c) => c.id));
+    controls.tokenCondAdd.innerHTML =
+      '<option value="">+ Add a condition…</option>' +
+      CONDITIONS[state.conditionSystem]
+        .filter(([id]) => !have.has(id))
+        .map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`)
+        .join("");
+    controls.tokenCondAdd.value = "";
+  }
+}
+
+// One change to the selected token's conditions: an undo step, then redraw and sync.
+function editTokenConditions(change) {
+  const token = editingToken();
+  if (!token) return;
+  pushHistory();
+  if (!token.conditions) token.conditions = [];
+  change(token);
+  token.conditions = token.conditions.filter((c) => c);
+  if (!token.conditions.length) delete token.conditions;
+  renderTokenConditions();
+  renderAndSync();
+  updateInitiativeUI();
+}
+
+function addTokenCondition(id) {
+  const def = CONDITION_DEFS[state.conditionSystem][id];
+  if (!def) return;
+  editTokenConditions((token) => {
+    if (!token.conditions.some((c) => c.id === id)) token.conditions.push(def.max ? { id, value: 1 } : { id });
+  });
+}
+
+function changeTokenCondition(id, act, input) {
+  editTokenConditions((token) => {
+    const i = token.conditions.findIndex((c) => c.id === id);
+    const c = token.conditions[i];
+    if (!c) return;
+    const def = conditionDef(id);
+    if (act === "remove") token.conditions[i] = null;
+    else if (act === "gm") {
+      if (c.gm) delete c.gm;
+      else c.gm = true;
+    } else if (act === "inc") c.value = Math.min(def.max || 9, (Number(c.value) || 1) + 1);
+    else if (act === "dec") {
+      // Going below 1 removes it, like Frightened wearing off.
+      const v = (Number(c.value) || 1) - 1;
+      if (v < 1) token.conditions[i] = null;
+      else c.value = v;
+    } else if (act === "rounds") {
+      const n = Math.round(Number(input.value));
+      if (input.value === "" || !(n > 0)) delete c.until;
+      else c.until = state.initiative.round + n - 1;
+    }
+  });
+}
+
+// When a new round starts, conditions whose rounds have run out drop off (on every floor).
+function expireConditions() {
+  const prune = (tokens) =>
+    (tokens || []).forEach((t) => {
+      if (!t.conditions) return;
+      t.conditions = t.conditions.filter((c) => !conditionExpired(c));
+      if (!t.conditions.length) delete t.conditions;
+    });
+  prune(state.tokens);
+  state.floors.forEach((f) => f.id !== state.currentFloorId && prune(f.tokens));
+  renderTokenConditions();
+}
+
+// Badges around the token's upper-right edge: a coloured disc with the short code, plus a small
+// number for a value. GM-only ones get a dashed ring. More than six: the last one says "+n".
+function drawTokenConditions(token, r) {
+  const list = activeConditions(token);
+  if (!list.length) return;
+  const u = 1 / (curK * curMs); // one screen pixel, in native units
+  const br = Math.max(r * 0.3, 8 * u);
+  const ring = tokenIsSquare(token) ? r * 1.2 : r;
+  const step = Math.min(0.75, (2.25 * br) / ring);
+  const shown = list.length > 6 ? list.slice(0, 5) : list;
+  const items = shown.map((c) => ({ c, def: conditionDef(c.id) }));
+  if (list.length > 6) items.push({ more: list.length - 5 });
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  items.forEach((it, i) => {
+    const a = -Math.PI / 2 + 0.35 + i * step;
+    const x = token.x + Math.cos(a) * ring;
+    const y = token.y + Math.sin(a) * ring;
+    ctx.beginPath();
+    ctx.arc(x, y, br, 0, Math.PI * 2);
+    ctx.fillStyle = it.more ? "#2a2d33" : it.def.color;
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, 1.5 * u);
+    ctx.strokeStyle = "rgba(10, 10, 12, 0.85)";
+    if (it.c?.gm) ctx.setLineDash([3 * u, 2 * u]);
+    if (it.c?.gm) ctx.strokeStyle = "#eef1ef";
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `700 ${br * 0.95}px Inter, sans-serif`;
+    ctx.fillText(it.more ? `+${it.more}` : it.def.abbr, x, y + br * 0.04);
+    if (it.c?.value) {
+      const vx = x + br * 0.72;
+      const vy = y + br * 0.72;
+      const vr = br * 0.55;
+      ctx.beginPath();
+      ctx.arc(vx, vy, vr, 0, Math.PI * 2);
+      ctx.fillStyle = "#0c0d0f";
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `700 ${vr * 1.35}px Inter, sans-serif`;
+      ctx.fillText(String(it.c.value), vx, vy + vr * 0.06);
+    }
+  });
+  ctx.restore();
+}
+
+// The same badges as HTML, for the initiative panel and overlay.
+function conditionChipsHtml(token) {
+  if (!token) return "";
+  return activeConditions(token)
+    .map((c) => {
+      const def = conditionDef(c.id);
+      return `<span class="cond-badge small${c.gm ? " gm" : ""}" style="--cond:${def.color}" title="${escapeHtml(conditionLabel(c))}">${escapeHtml(def.abbr)}${c.value ? `<i>${Number(c.value)}</i>` : ""}</span>`;
+    })
+    .join("");
 }
 
 /* ----------------------------- map images & notes ----------------------------- */
@@ -5114,8 +5402,13 @@ function stepInitiative(dir) {
     turn = list.length - 1;
     round = Math.max(1, round - 1);
   }
+  const newRound = round > state.initiative.round;
   state.initiative.turn = turn;
   state.initiative.round = round;
+  if (newRound) {
+    expireConditions(); // timed conditions that have run out drop off
+    render();
+  }
   updateInitiativeUI();
   broadcastState();
 }
@@ -5147,6 +5440,7 @@ function renderInitiativePanel() {
     .map((c, i) => {
       const pct = c.maxHp > 0 ? Math.max(0, Math.min(100, ((c.hp || 0) / c.maxHp) * 100)) : 0;
       const linked = !!tokenForCombatant(c.id);
+      const conds = conditionChipsHtml(tokenForCombatant(c.id));
       const linking = linkingCombatantId === c.id;
       const linkState = linking ? " linking" : linked ? " linked" : "";
       const linkTitle = linking
@@ -5170,6 +5464,7 @@ function renderInitiativePanel() {
           <span class="init-hp-max">/ ${c.maxHp ?? "–"}</span>
           <button type="button" class="init-hp-step" data-act="hp-up" title="Heal 1" aria-label="Heal">+</button>
         </div>
+        ${conds ? `<div class="init-conds">${conds}</div>` : ""}
       </div>`;
     })
     .join("");
@@ -5193,7 +5488,8 @@ function renderInitiativeOverlay() {
     .map((c, i) => {
       const hp = !isPlayer && c.hp != null ? ` <em>${c.hp}${c.maxHp != null ? `/${c.maxHp}` : ""}</em>` : "";
       const conc = c.concentration ? `<span class="init-conc-badge" title="Concentration" aria-label="Concentration">C</span>` : "";
-      return `<li class="${i === init.turn ? "current" : ""}"><span class="init-dot ${c.type}"></span><span class="init-ov-name">${escapeHtml(c.name)}</span>${conc}${hp}</li>`;
+      const conds = conditionChipsHtml(tokenForCombatant(c.id));
+      return `<li class="${i === init.turn ? "current" : ""}"><span class="init-dot ${c.type}"></span><span class="init-ov-name">${escapeHtml(c.name)}</span>${conds}${conc}${hp}</li>`;
     })
     .join("");
   // GM gets turn arrows + a hide button in the header; the player just sees the round label.

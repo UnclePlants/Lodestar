@@ -465,6 +465,20 @@
                 <input id="tokenHidden" type="checkbox">
                 <span>Hidden from players (stealth)</span>
               </label>
+              <!-- Conditions: badges on the token (players see them unless marked GM-only). -->
+              <div class="token-conds">
+                <div class="token-conds-head">
+                  <span class="token-rolls-title">Conditions</span>
+                  <select id="conditionSystem" title="Which game's conditions to list (for every token)" aria-label="Game system for conditions">
+                    <option value="dnd5e">D&amp;D 5e</option>
+                    <option value="pf2e">Pathfinder 2e</option>
+                  </select>
+                </div>
+                <div id="tokenCondList" class="token-cond-list"></div>
+                <select id="tokenCondAdd" class="token-cond-add" aria-label="Add a condition">
+                  <option value="">+ Add a condition…</option>
+                </select>
+              </div>
               <!-- Saved rolls (GM only): click one to roll it, labelled with this token. -->
               <div class="token-rolls">
                 <span class="token-rolls-title">Rolls</span>

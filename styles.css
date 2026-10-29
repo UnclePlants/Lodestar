@@ -3172,6 +3172,142 @@ input:disabled {
   padding: 0 10px;
 }
 
+/* Condition badges: a coloured disc with a short code (the same look as on the map). --cond is
+   the condition's colour; a value rides in the corner. */
+.cond-badge {
+  align-items: center;
+  background: var(--cond, #666);
+  border: 1px solid rgba(10, 10, 12, 0.85);
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  flex: none;
+  font-size: 0.66rem;
+  font-weight: 700;
+  height: 22px;
+  justify-content: center;
+  position: relative;
+  width: 22px;
+}
+
+.cond-badge.small {
+  font-size: 0.6rem;
+  height: 18px;
+  width: 18px;
+}
+
+.cond-badge.gm {
+  border: 1px dashed #eef1ef;
+}
+
+.cond-badge i {
+  background: #0c0d0f;
+  border-radius: 999px;
+  bottom: -5px;
+  font-size: 0.56rem;
+  font-style: normal;
+  line-height: 11px;
+  min-width: 11px;
+  padding: 0 2px;
+  position: absolute;
+  right: -5px;
+}
+
+/* Conditions in the selected-token editor: one row each (badge, name, value, rounds, GM, ×). */
+.token-conds {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.token-conds-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.token-conds-head select {
+  font-size: 0.76rem;
+  min-height: 26px;
+  padding: 0 4px;
+}
+
+.token-cond-list {
+  display: grid;
+  gap: 4px;
+}
+
+.token-cond {
+  align-items: center;
+  display: flex;
+  font-size: 0.8rem;
+  gap: 6px;
+}
+
+.token-cond-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.token-cond button {
+  font-size: 0.72rem;
+  min-height: 22px;
+  padding: 0 5px;
+}
+
+.token-cond-value {
+  align-items: center;
+  display: inline-flex;
+  gap: 3px;
+}
+
+.token-cond-value b {
+  min-width: 1.1em;
+  text-align: center;
+}
+
+.token-cond-rounds {
+  font-size: 0.74rem;
+  min-height: 22px;
+  padding: 0 3px;
+  width: 38px;
+}
+
+.token-cond-gm[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.token-cond-remove {
+  color: var(--muted);
+}
+
+.token-cond-remove:hover {
+  color: var(--danger);
+}
+
+.token-cond-add {
+  font-size: 0.8rem;
+  min-height: 28px;
+}
+
+/* Conditions in the initiative panel and overlay. */
+.init-conds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.initiative-overlay .cond-badge {
+  margin-left: -2px;
+}
+
 /* Saved rolls in the selected-token editor. */
 .token-rolls {
   border-top: 1px solid var(--line);
