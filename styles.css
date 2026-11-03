@@ -2120,6 +2120,11 @@ input:disabled {
   z-index: 8;
 }
 
+.hint code {
+  color: var(--text);
+  font-size: 0.95em;
+}
+
 .gm-notice.on {
   opacity: 1;
   pointer-events: auto;

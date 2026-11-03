@@ -137,6 +137,7 @@
     <li><a href="#start">Getting started</a></li>
     <li><a href="#cast">The player display</a></li>
     <li><a href="#weather">Weather</a></li>
+    <li><a href="#lighting">VTT maps &amp; lighting</a></li>
     <li><a href="#navigate">Moving around the map</a></li>
     <li><a href="#grid">Grid &amp; calibration</a></li>
     <li><a href="#fog">Fog of war</a></li>
@@ -208,6 +209,18 @@
     <li>During a storm, lightning flashes softly every several seconds; <strong>Lightning now</strong> calls one on cue. On a computer set to reduce motion, each flash is one slow, gentle glow instead of a flicker.</li>
     <li>The weather is saved with the map, so each location keeps its own.</li>
   </ul>
+</section>
+
+<section id="lighting">
+  <h2 class="sec">VTT maps &amp; lighting <a class="top" href="#about">↑ top</a></h2>
+  <p>Map makers like Dungeondraft, Dungeon Alchemist and DungeonFog can export a <strong>Universal VTT</strong> file (<code>.dd2vtt</code>, <code>.uvtt</code> or <code>.df2vtt</code>). It holds the map image together with its grid, its walls, its doors and its light sources. Load one with <strong>Load map</strong>, just like an image:</p>
+  <ul>
+    <li>The map comes in with its <strong>grid already set</strong>, so tokens, snapping and the ruler are right from the start.</li>
+    <li>If the map has lights and isn't lit by daylight, <strong>lighting</strong> turns on: the player display goes dark except where the lights reach, and light stops at walls and closed doors. You see the same darkness at half strength, so you can still read the map.</li>
+    <li>On your screen the <strong>walls</strong> show in pink, <strong>doors</strong> in orange when shut and green dashed when open, and each <strong>light</strong> as a dot with its reach as a dashed circle. Untick <strong>Show walls, doors and lights on my map</strong> to hide them.</li>
+    <li>In Move mode, <strong>click a door</strong> to open or close it. Light spills through the doorway on both screens.</li>
+  </ul>
+  <p>The <strong>Lighting</strong> section of the GM panel turns the darkness on or off and sets how dark it gets. It also counts the walls, doors and lights on the current floor. Each floor keeps its own, and they're saved with the map. Lighting works on any map, too: with no lights, the darkness simply makes it night.</p>
 </section>
 
 <section id="navigate">

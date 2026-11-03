@@ -61,6 +61,7 @@ Prefer to run it offline? [Download the latest release](https://github.com/Uncle
 - **Splash screen and blackout** to show an image or a black screen between scenes.
 - **Weather** on the player display: rain, storms with lightning, snow, drifting fog, or rising embers, with intensity and wind, saved with each map.
 - **Smooth fades**: revealed fog fades away on the player display, and changing map or floor fades through black.
+- **VTT maps with walls, doors and lights**: load a Universal VTT file (`.dd2vtt` from Dungeondraft or Dungeon Alchemist, `.uvtt`, `.df2vtt`) and its grid comes in set up. The player display goes dark except where the lights reach; light stops at walls and closed doors, and you click a door to open it.
 
 ### Fog of war
 
@@ -135,6 +136,7 @@ Lodestar is plain HTML, CSS and JavaScript with **no build step and no dependenc
 | `app.js` | Everything else: maps, fog, tokens, floors, sync between windows, the library |
 | `dice.js` | The dice roller: notation parser, rigid-body physics, and the 3D renderer |
 | `weather.js` | Rain, storms, snow, fog and embers, drawn on their own overlay |
+| `lighting.js` | Reading Universal VTT maps, and the darkness and light, with walls and doors casting shadows |
 | `styles.css` | All styling |
 | `manual.html` | The user manual (images in `manual/`) |
 

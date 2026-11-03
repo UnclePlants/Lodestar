@@ -98,8 +98,8 @@
 
         <section class="control-section">
           <div class="top-actions">
-            <label class="top-action file-loader" title="Load map (image, GIF or video)" aria-label="Load map image, GIF or video">
-              <input id="mapUpload" type="file" accept="image/*,video/*">
+            <label class="top-action file-loader" title="Load map (image, GIF, video or VTT map)" aria-label="Load map image, GIF, video or VTT map">
+              <input id="mapUpload" type="file" accept="image/*,video/*,.dd2vtt,.uvtt,.df2vtt">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/></svg>
             </label>
             <button id="loadLibrary" class="top-action empty" type="button" title="My maps" aria-label="My maps">
@@ -283,6 +283,26 @@
             <span>Show it faintly on my screen too</span>
           </label>
           <p class="hint">Plays over the map on the player display, and is saved with the map.</p>
+        </section>
+
+        <section class="control-section">
+          <div class="section-title">
+            <h2>Lighting</h2>
+          </div>
+          <label class="checkbox-row">
+            <input id="lightingEnabled" type="checkbox">
+            <span>Darkness on the player display</span>
+          </label>
+          <label>
+            Darkness
+            <input id="lightingDarkness" type="range" min="0.2" max="1" step="0.05" value="0.8">
+          </label>
+          <label class="checkbox-row">
+            <input id="lightingOverlay" type="checkbox" checked>
+            <span>Show walls, doors and lights on my map</span>
+          </label>
+          <p class="hint" id="lightingInfo">This floor has no walls or lights yet.</p>
+          <p class="hint">Load a Universal VTT map (<code>.dd2vtt</code> from Dungeondraft or Dungeon Alchemist, <code>.uvtt</code>, <code>.df2vtt</code>) with <strong>Load map</strong> to bring in its walls, doors and lights. Light stops at walls and closed doors; in Move mode, click a door to open or close it.</p>
         </section>
 
         <section class="control-section">
@@ -998,6 +1018,7 @@
 
     <script src="dice.js?v=1.5.0"></script>
     <script src="weather.js?v=1.5.0"></script>
+    <script src="lighting.js?v=1.5.0"></script>
     <script src="app.js?v=1.5.0"></script>
   </body>
 </html>

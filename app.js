@@ -302,6 +302,9 @@ function tabGmId() {
 }
 const DEFAULT_GM_FOG_OPACITY = 0.3;
 const INITIAL_FLOOR_ID = "floor-1";
+// Darkness over the player display, lit by the floor's lights (see "lighting"); off until a
+// map with lights comes in, or the GM turns it on.
+const DEFAULT_LIGHTING = { enabled: false, darkness: 0.8 };
 
 // Each floor is its own map (image + fog + tokens + stairs + view). The top-level
 // imageData/fog/tokens/stairs/view fields below always mirror the CURRENT floor so the
@@ -323,6 +326,11 @@ function makeFloor(id) {
     images: [],
     notes: [],
     aoeMarkers: [],
+    // From a Universal VTT map (see "lighting"): wall polylines, doors and lights, in map px.
+    walls: [],
+    doors: [],
+    lights: [],
+    lighting: { ...DEFAULT_LIGHTING },
     view: { scale: 1, cx: 0, cy: 0, rotation: 0 },
   };
 }
@@ -353,6 +361,11 @@ const state = {
   images: [],
   notes: [],
   aoeMarkers: [], // persistent AoE regions; shapes/positions synced to players, labels are GM-only
+  // The current floor's walls, doors and lights, and its darkness (see "lighting").
+  walls: [],
+  doors: [],
+  lights: [],
+  lighting: { ...DEFAULT_LIGHTING },
   stairColor: "#ffffff", // GM-only stair marker color (stairs never show on the player display)
   // Initiative tracker: a turn order shared across all floors. When showPlayers is on, a
   // compact order overlay is mirrored to the player display.
@@ -1297,6 +1310,7 @@ function setup() {
   }
   setupDice();
   setupWeather();
+  setupLighting();
 
   // Two transports so the link works whether or not BroadcastChannel delivers between
   // windows (it is unreliable on file://): the BroadcastChannel and a direct
@@ -1757,15 +1771,30 @@ function loadMapFile(event) {
   if (!file) return;
 
   // Images, animated GIFs and videos all arrive as a data URL; loadMapMedia() picks the
-  // right player from its MIME type.
+  // right player from its MIME type. A Universal VTT map is JSON carrying its image (as
+  // base64) along with its grid, walls, doors and lights (see "lighting").
+  const isVtt = /\.(dd2vtt|uvtt|df2vtt)$/i.test(file.name);
   const reader = new FileReader();
   reader.onerror = () => window.alert("Could not read that map file.");
   reader.onload = () => {
+    let scene = null;
+    if (isVtt) {
+      try {
+        scene = LodestarLight.parseVtt(reader.result);
+      } catch (error) {
+        window.alert(`Could not read that map: ${error.message}.`);
+        return;
+      }
+    }
     shell.classList.remove("is-demo"); // your own map: drop the demo-map credit
     libraryContentSig = null; // a new map isn't in the library yet
     sessionMapName = "";
-    state.imageData = reader.result;
+    state.imageData = scene ? scene.image : reader.result;
     state.imageName = file.name;
+    state.walls = [];
+    state.doors = [];
+    state.lights = [];
+    state.lighting = { ...DEFAULT_LIGHTING };
     state.imageId = uuid();
     state.map.scale = 1;
     state.fog.rooms = [];
@@ -1779,6 +1808,8 @@ function loadMapFile(event) {
     loadMapMedia(state.imageData, () => {
       state.imageWidth = mapMedia.width;
       state.imageHeight = mapMedia.height;
+      if (scene) applyVttScene(scene);
+      else syncLightingControls();
       fogDirty = true;
       captureCurrentFloor(); // flush new image into the current floor record
       updatePlayerSliderRanges();
@@ -1789,7 +1820,8 @@ function loadMapFile(event) {
       renderAndSync();
     });
   };
-  reader.readAsDataURL(file);
+  if (isVtt) reader.readAsText(file);
+  else reader.readAsDataURL(file);
 }
 
 function loadSplashFile(event) {
@@ -2379,6 +2411,10 @@ function loadSnapshot(snapshot) {
     state.images = Array.isArray(snapshot.images) ? snapshot.images : [];
     state.notes = []; // notes are GM-only and never arrive on the player
     state.aoeMarkers = Array.isArray(snapshot.aoeMarkers) ? snapshot.aoeMarkers : [];
+    state.walls = Array.isArray(snapshot.walls) ? snapshot.walls : [];
+    state.doors = Array.isArray(snapshot.doors) ? snapshot.doors : [];
+    state.lights = Array.isArray(snapshot.lights) ? snapshot.lights : [];
+    state.lighting = { ...DEFAULT_LIGHTING, ...snapshot.lighting };
     Object.assign(state.view, snapshot.view || {});
     state.imageId = snapshot.imageId || state.imageId;
     state.imageData = snapshot.imageData || state.imageData; // keep the image assets delivered separately
@@ -2545,6 +2581,10 @@ function captureCurrentFloor() {
   floor.images = JSON.parse(JSON.stringify(state.images));
   floor.notes = JSON.parse(JSON.stringify(state.notes));
   floor.aoeMarkers = JSON.parse(JSON.stringify(state.aoeMarkers));
+  floor.walls = state.walls; // replaced whole, never edited in place, so no copy needed
+  floor.doors = state.doors.map((d) => ({ ...d }));
+  floor.lights = state.lights;
+  floor.lighting = { ...state.lighting };
   floor.view = { ...state.view };
 }
 
@@ -2565,6 +2605,11 @@ function applyFloor(floor) {
   state.images = JSON.parse(JSON.stringify(floor.images || []));
   state.notes = JSON.parse(JSON.stringify(floor.notes || []));
   state.aoeMarkers = JSON.parse(JSON.stringify(floor.aoeMarkers || []));
+  state.walls = floor.walls || [];
+  state.doors = (floor.doors || []).map((d) => ({ ...d }));
+  state.lights = floor.lights || [];
+  state.lighting = { ...DEFAULT_LIGHTING, ...floor.lighting };
+  syncLightingControls();
   Object.assign(state.view, floor.view || { scale: 1, cx: 0, cy: 0 });
   state.view.rotation = floor.view?.rotation || 0; // default older floors with no rotation
   fogDirty = true;
@@ -3365,11 +3410,13 @@ function render() {
   // black for players, dimmed under the GM tint).
   drawImages();
   drawTokens();
+  drawLighting(); // darkness over the map and tokens, lit by the floor's lights
   compositeFog();
   drawAoeMarkers(); // persistent AoE regions (above fog, below hover template)
   drawAoeTemplate(); // hover template sits above fog; visible to both GM and player
   if (!isPlayer) drawRoomOutlines();
   if (!isPlayer) drawStairs(); // stairs are a GM-only navigation aid stays above fog
+  if (!isPlayer) drawSceneOverlay(); // walls, doors and lights
   if (!isPlayer) drawDraftRoom();
   if (!isPlayer) drawStampDraft();
   if (!isPlayer) drawCalibrationDraft();
@@ -3471,6 +3518,182 @@ function drawGrid(worldW, worldH) {
   }
   ctx.stroke();
   ctx.restore();
+}
+
+/* ----------------------------- lighting -----------------------------
+
+A Universal VTT map (.dd2vtt, .uvtt, .df2vtt) brings its walls, doors and lights (lighting.js
+reads the file). With lighting on, the player display goes dark except where the lights reach,
+and light stops at walls and closed doors; the GM sees the same darkness at half strength. The
+GM also sees the walls (pink), doors (orange shut, green dashed open) and lights as an overlay,
+and clicks a door in Move mode to open or close it. Each floor keeps its own set and darkness.
+The darkness and colour layers are redrawn only when something about them changes. */
+
+const LIGHT_MAX_EDGE = 2048; // light is soft, so a coarser layer than the fog will do
+const LIGHT_GM_STRENGTH = 0.5;
+const LIGHT_OVERLAY_KEY = "lodestar.lightOverlay";
+const darkCanvas = document.createElement("canvas");
+const tintCanvas = document.createElement("canvas");
+const lightCache = {}; // each light's shadow polygon, kept until walls/doors/lights change
+let lightSig = ""; // what the layers were last drawn for
+let lightOverlay = true; // GM: show walls, doors and lights on the map (remembered per browser)
+
+function lightingActive() {
+  return !!state.lighting?.enabled && state.imageWidth > 0;
+}
+
+function drawLighting() {
+  if (!lightingActive()) return;
+  const scale = Math.min(1, LIGHT_MAX_EDGE / Math.max(state.imageWidth, state.imageHeight));
+  const w = Math.max(1, Math.round(state.imageWidth * scale));
+  const h = Math.max(1, Math.round(state.imageHeight * scale));
+  const sig = `${state.imageId}|${state.currentFloorId}|${w}x${h}|${state.lighting.darkness}|${state.walls.length}|${state.doors.map((d) => (d.open ? 1 : 0)).join("")}|${state.lights.length}`;
+  if (sig !== lightSig || darkCanvas.width !== w || darkCanvas.height !== h) {
+    [darkCanvas, tintCanvas].forEach((c) => {
+      c.width = w;
+      c.height = h;
+    });
+    LodestarLight.buildLightmap(darkCanvas, tintCanvas, { walls: state.walls, doors: state.doors, lights: state.lights, darkness: state.lighting.darkness }, scale, lightCache);
+    lightSig = sig;
+  }
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.globalAlpha = isPlayer ? 1 : 0.6;
+  ctx.globalCompositeOperation = "soft-light";
+  ctx.drawImage(tintCanvas, 0, 0, w, h, 0, 0, state.imageWidth, state.imageHeight);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = isPlayer ? 1 : LIGHT_GM_STRENGTH;
+  ctx.drawImage(darkCanvas, 0, 0, w, h, 0, 0, state.imageWidth, state.imageHeight);
+  ctx.restore();
+}
+
+// GM: the walls, doors and lights over the map, at a constant on-screen thickness.
+function drawSceneOverlay() {
+  if (!lightOverlay || (!state.walls.length && !state.doors.length && !state.lights.length)) return;
+  const px = 1 / ((curK || 1) * (curMs || 1)); // one screen pixel, in map pixels
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(255, 95, 162, 0.85)";
+  ctx.lineWidth = 2.5 * px;
+  ctx.beginPath();
+  state.walls.forEach((pts) => pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))));
+  ctx.stroke();
+  state.doors.forEach((d) => {
+    const color = d.open ? "rgba(120, 220, 140, 0.95)" : "rgba(255, 170, 60, 0.95)";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 5 * px;
+    ctx.setLineDash(d.open ? [7 * px, 6 * px] : []);
+    ctx.beginPath();
+    ctx.moveTo(d.a.x, d.a.y);
+    ctx.lineTo(d.b.x, d.b.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color;
+    ctx.fillRect((d.a.x + d.b.x) / 2 - 4 * px, (d.a.y + d.b.y) / 2 - 4 * px, 8 * px, 8 * px);
+  });
+  state.lights.forEach((l) => {
+    ctx.globalAlpha = 0.45;
+    ctx.strokeStyle = l.color;
+    ctx.lineWidth = 1.5 * px;
+    ctx.setLineDash([5 * px, 5 * px]);
+    ctx.beginPath();
+    ctx.arc(l.x, l.y, l.range, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = l.color;
+    ctx.strokeStyle = "rgba(10, 10, 12, 0.9)";
+    ctx.beginPath();
+    ctx.arc(l.x, l.y, 5 * px, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+// The door under a map point (within a few screen pixels of it), if the overlay shows doors.
+function hitDoor(native) {
+  if (isPlayer || !lightOverlay || !state.doors.length) return null;
+  const reach = 9 / ((curK || 1) * (curMs || 1));
+  let best = null;
+  let bestD = reach;
+  state.doors.forEach((d) => {
+    const dx = d.b.x - d.a.x;
+    const dy = d.b.y - d.a.y;
+    const len2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((native.x - d.a.x) * dx + (native.y - d.a.y) * dy) / len2));
+    const dist = Math.hypot(native.x - (d.a.x + t * dx), native.y - (d.a.y + t * dy));
+    if (dist < bestD) {
+      best = d;
+      bestD = dist;
+    }
+  });
+  return best;
+}
+
+function toggleDoor(door) {
+  door.open = !door.open;
+  renderAndSync();
+}
+
+// Bring in a parsed Universal VTT file's walls, doors, lights and grid, once its image has
+// loaded (the image can come out at another size than the file describes, so scale to it).
+function applyVttScene(scene) {
+  const k = scene.size.w > 0 ? state.imageWidth / scene.size.w : 1;
+  const at = (p) => ({ x: p.x * k, y: p.y * k });
+  state.walls = scene.walls.map((line) => line.map(at));
+  state.doors = scene.doors.map((d) => ({ a: at(d.a), b: at(d.b), open: d.open }));
+  state.lights = scene.lights.map((l) => ({ ...at(l), range: l.range * k, color: l.color, intensity: l.intensity, shadows: l.shadows }));
+  // Dark unless the map says it's lit by daylight (a near-white ambient light).
+  const ambient = LodestarLight.luminance(scene.ambient);
+  state.lighting = { enabled: state.lights.length > 0 && ambient < 0.95, darkness: ambient < 0.95 ? Math.min(0.95, Math.max(0.5, 1 - ambient)) : DEFAULT_LIGHTING.darkness };
+  // The file's grid: one square is `cell` pixels.
+  state.map.scale = 1;
+  state.grid.size = Math.round(scene.cell * k * 100) / 100;
+  state.grid.offsetX = 0;
+  state.grid.offsetY = 0;
+  syncControlsFromState();
+  syncLightingControls();
+}
+
+function setupLighting() {
+  if (isPlayer) return;
+  try {
+    lightOverlay = localStorage.getItem(LIGHT_OVERLAY_KEY) !== "0";
+  } catch {}
+  const enabled = document.getElementById("lightingEnabled");
+  const darkness = document.getElementById("lightingDarkness");
+  const overlay = document.getElementById("lightingOverlay");
+  enabled?.addEventListener("change", () => {
+    state.lighting.enabled = enabled.checked;
+    renderAndSync();
+  });
+  darkness?.addEventListener("input", () => {
+    state.lighting.darkness = Number(darkness.value);
+    render();
+    queueStateSync();
+  });
+  overlay?.addEventListener("change", () => {
+    lightOverlay = overlay.checked;
+    try {
+      localStorage.setItem(LIGHT_OVERLAY_KEY, lightOverlay ? "1" : "0");
+    } catch {}
+    render();
+  });
+  syncLightingControls();
+}
+
+function syncLightingControls() {
+  if (isPlayer) return;
+  const enabled = document.getElementById("lightingEnabled");
+  if (!enabled) return;
+  enabled.checked = !!state.lighting.enabled;
+  document.getElementById("lightingDarkness").value = String(state.lighting.darkness);
+  document.getElementById("lightingOverlay").checked = lightOverlay;
+  const info = document.getElementById("lightingInfo");
+  const n = (count, one) => `${count} ${one}${count === 1 ? "" : "s"}`;
+  if (info) info.textContent = state.walls.length || state.doors.length || state.lights.length ? `This floor: ${n(state.walls.length, "wall")} · ${n(state.doors.length, "door")} · ${n(state.lights.length, "light")}.` : "This floor has no walls or lights yet.";
 }
 
 /* ----------------------------- fog ----------------------------- */
@@ -7107,6 +7330,11 @@ function onPointerDown(event) {
       render();
       return;
     }
+    const door = hitDoor(native);
+    if (door) {
+      toggleDoor(door);
+      return;
+    }
     // Stairs and spell areas are drawn above handouts, so they're picked first.
     const stair = hitStair(native);
     if (stair) {
@@ -7201,7 +7429,7 @@ function onPointerMove(event) {
     // Hint that the player-view frame can be dragged.
     if (mode === "pan" && state.imageData) {
       const frame = playerFrameCorners();
-      canvas.style.cursor = frame && pointInPolygon(clientToCanvasPoint(event), frame) ? "move" : "";
+      canvas.style.cursor = hitDoor(toNativePoint(event)) ? "pointer" : frame && pointInPolygon(clientToCanvasPoint(event), frame) ? "move" : "";
     }
     return;
   }
