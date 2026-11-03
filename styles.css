@@ -2085,6 +2085,47 @@ input:disabled {
   color: var(--accent);
 }
 
+/* Concentration (see "concentration" in app.js): the row's sparkle, lit while a spell is held,
+   and the ✦ chip beside the conditions in the row and the turn order. */
+.init-concentrate.on {
+  color: #b994ff;
+}
+
+.init-concentrate.on svg {
+  fill: currentColor;
+}
+
+.cond-badge.conc {
+  --cond: #7b52e0;
+}
+
+/* A GM-only notice over the bottom of the map (a concentration save to call); click to close. */
+.gm-notice {
+  background: rgba(25, 28, 29, 0.97);
+  border: 1px solid #7b52e0;
+  border-radius: 8px;
+  bottom: 64px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9rem;
+  left: 50%;
+  max-width: min(520px, calc(100% - 40px));
+  opacity: 0;
+  padding: 9px 14px;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, 6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 8;
+}
+
+.gm-notice.on {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
 .init-link.linking {
   color: var(--accent);
   animation: init-link-pulse 1s ease-in-out infinite;
@@ -2114,29 +2155,6 @@ input:disabled {
   background: none;
   border: 0;
   color: var(--danger);
-}
-
-.init-conc {
-  background: none;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  color: var(--muted);
-  flex-shrink: 0;
-  font-size: 0.78rem;
-  font-weight: 700;
-  min-height: 0;
-  padding: 2px 6px;
-}
-
-.init-conc:hover {
-  border-color: var(--accent);
-  color: var(--text);
-}
-
-.init-conc.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #1b1508;
 }
 
 .init-hp-line {
@@ -2669,16 +2687,6 @@ input:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.init-conc-badge {
-  background: var(--accent);
-  border-radius: 4px;
-  color: #1b1508;
-  flex: none;
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 1px 5px;
 }
 
 .initiative-overlay em {

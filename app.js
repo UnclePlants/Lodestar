@@ -1576,7 +1576,7 @@ function bindControls() {
     else if (event.target.closest("[data-act='hp-up']")) adjustHp(id, 1);
     else if (event.target.closest("[data-act='link']")) onInitLink(id, event.altKey);
     else if (event.target.closest("[data-act='set-turn']")) setTurnToId(id);
-    else if (event.target.closest("[data-act='toggle-conc']")) toggleConcentration(id);
+    else if (event.target.closest("[data-act='concentrate']")) setConcentrating(id, !combatantById(id)?.concentrating);
   });
   controls.initList?.addEventListener("change", (event) => {
     const row = event.target.closest("[data-id]");
@@ -1584,8 +1584,10 @@ function bindControls() {
     const c = state.initiative.combatants.find((x) => x.id === row.dataset.id);
     if (!c) return;
     if (event.target.matches("[data-field='hp']")) {
+      const before = c.hp;
       c.hp = event.target.value === "" ? null : Math.max(0, Number(event.target.value) || 0);
       if (c.hp != null && (c.maxHp == null || c.hp > c.maxHp)) c.maxHp = c.hp;
+      checkConcentration(c, before, c.hp);
     } else if (event.target.matches("[data-field='init']")) {
       const currentId = currentTurnCombatantId();
       c.init = Number(event.target.value) || 0;
@@ -2346,6 +2348,11 @@ function loadSnapshot(snapshot) {
   if (isPlayer) state.conditionSystem = snapshot.conditionSystem === "pf2e" ? "pf2e" : "dnd5e";
   if (snapshot.initiative) {
     state.initiative = { active: false, showPlayers: false, showOverlay: true, round: 1, turn: 0, combatants: [], ...snapshot.initiative };
+    // Older saves kept concentration as `concentration` (see "concentration").
+    state.initiative.combatants.forEach((c) => {
+      if (c.concentration) c.concentrating = true;
+      delete c.concentration;
+    });
   }
   if (snapshot.fog) {
     state.fog.toolSize = snapshot.fog.toolSize ?? state.fog.toolSize;
@@ -5479,7 +5486,7 @@ function addCombatant() {
   if (init.error || hpRoll.error) return;
   const hp = hpRoll.value;
   const type = controls.initType.value || "player";
-  const combatant = { id: uuid(), name, type, init: init.value, hp, maxHp: hp, concentration: false };
+  const combatant = { id: uuid(), name, type, init: init.value, hp, maxHp: hp };
   if (init.mod != null) combatant.initMod = init.mod;
   if (init.formula) combatant.initFormula = init.formula;
   if (hpRoll.formula) combatant.hpFormula = hpRoll.formula;
@@ -5666,17 +5673,83 @@ function adjustHp(id, delta) {
   const c = state.initiative.combatants.find((x) => x.id === id);
   if (!c || c.hp == null) return;
   const cap = c.maxHp == null ? Infinity : c.maxHp;
+  const before = c.hp;
   c.hp = Math.max(0, Math.min(cap, (c.hp || 0) + delta));
+  checkConcentration(c, before, c.hp);
   updateInitiativeUI();
   broadcastState();
 }
 
-function toggleConcentration(id) {
-  const c = state.initiative.combatants.find((x) => x.id === id);
+/* ---- concentration ----
+A combatant holding a spell gets a ✦ chip in its row and in the turn order, on both screens
+(the row's sparkle button turns it on and off). In D&D 5e, taking damage calls for a
+Constitution save: the hits that land within a moment are added up (clicking − five times is
+one hit of 5) and the GM gets a reminder of the DC, half the damage but at least 10. Dropping
+to 0 HP ends it, in either system; Pathfinder 2e has no such save, so there it only tracks the
+spell being sustained. */
+const CONCENTRATION_HIT_MS = 900;
+const concentrationHits = new Map(); // combatant id -> { damage, timer } while hits are adding up
+
+function combatantById(id) {
+  return state.initiative.combatants.find((c) => c.id === id) || null;
+}
+
+function concentrationLabel() {
+  return state.conditionSystem === "pf2e" ? "Sustaining a spell" : "Concentrating";
+}
+
+function concentrationChipHtml(c) {
+  return c?.concentrating ? `<span class="cond-badge small conc" title="${concentrationLabel()}">✦</span>` : "";
+}
+
+function setConcentrating(id, on) {
+  const c = combatantById(id);
   if (!c) return;
-  c.concentration = !c.concentration;
+  if (on) c.concentrating = true;
+  else delete c.concentrating;
   updateInitiativeUI();
   broadcastState();
+}
+
+// `c`'s HP just went from `before` to `after` (GM only).
+function checkConcentration(c, before, after) {
+  if (isPlayer || !c.concentrating || before == null || after == null || after >= before) return;
+  const hit = concentrationHits.get(c.id) || { damage: 0, timer: 0 };
+  clearTimeout(hit.timer);
+  if (after === 0) {
+    concentrationHits.delete(c.id);
+    delete c.concentrating;
+    showGmNotice(`${c.name} drops to 0 HP: concentration ends.`);
+    return;
+  }
+  if (state.conditionSystem !== "dnd5e") return;
+  hit.damage += before - after;
+  hit.timer = setTimeout(() => {
+    concentrationHits.delete(c.id);
+    if (!combatantById(c.id)?.concentrating) return; // ended or removed meanwhile
+    const dc = Math.max(10, Math.floor(hit.damage / 2));
+    showGmNotice(`${c.name} took ${hit.damage} damage while concentrating: Constitution save, DC ${dc}.`);
+  }, CONCENTRATION_HIT_MS);
+  concentrationHits.set(c.id, hit);
+}
+
+// A short GM-only notice over the map; it fades after a few seconds, or on a click.
+let gmNoticeTimer = 0;
+function showGmNotice(text) {
+  if (isPlayer) return;
+  let el = document.getElementById("gmNotice");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "gmNotice";
+    el.className = "gm-notice";
+    el.setAttribute("role", "status");
+    el.addEventListener("click", () => el.classList.remove("on"));
+    canvas.parentElement.appendChild(el);
+  }
+  el.textContent = text;
+  el.classList.add("on");
+  clearTimeout(gmNoticeTimer);
+  gmNoticeTimer = setTimeout(() => el.classList.remove("on"), 7000);
 }
 
 function setTurnToId(id) {
@@ -5738,7 +5811,8 @@ function renderInitiativePanel() {
     .map((c, i) => {
       const pct = c.maxHp > 0 ? Math.max(0, Math.min(100, ((c.hp || 0) / c.maxHp) * 100)) : 0;
       const linked = !!tokenForCombatant(c.id);
-      const conds = conditionChipsHtml(tokenForCombatant(c.id));
+      const conds = concentrationChipHtml(c) + conditionChipsHtml(tokenForCombatant(c.id));
+      const concTitle = c.concentrating ? `${concentrationLabel()} (click to end)` : state.conditionSystem === "pf2e" ? "Sustaining a spell?" : "Concentrating on a spell?";
       const linking = linkingCombatantId === c.id;
       const linkState = linking ? " linking" : linked ? " linked" : "";
       const linkTitle = linking
@@ -5751,7 +5825,7 @@ function renderInitiativePanel() {
           <span class="init-dot ${c.type}"></span>
           <button type="button" class="init-name" data-act="set-turn" title="Set as current turn">${escapeHtml(c.name)}</button>
           <button type="button" class="init-link${linkState}" data-act="link" title="${linkTitle}" aria-label="${linkTitle}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><line x1="12" x2="12" y1="1" y2="4"/><line x1="12" x2="12" y1="20" y2="23"/><line x1="1" x2="4" y1="12" y2="12"/><line x1="20" x2="23" y1="12" y2="12"/></svg></button>
-          <button type="button" class="init-conc${c.concentration ? " active" : ""}" data-act="toggle-conc" title="Concentration" aria-label="Concentration" aria-pressed="${!!c.concentration}">C</button>
+          <button type="button" class="init-link init-concentrate${c.concentrating ? " on" : ""}" data-act="concentrate" title="${concTitle}" aria-label="${concTitle}" aria-pressed="${!!c.concentrating}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5 13.6 9a2 2 0 0 0 1.4 1.4l5.5 1.6-5.5 1.6a2 2 0 0 0-1.4 1.4L12 20.5 10.4 15A2 2 0 0 0 9 13.6L3.5 12 9 10.4A2 2 0 0 0 10.4 9Z"/></svg></button>
           <input class="init-init" type="number" data-field="init" value="${c.init}" title="Initiative${c.initMod != null ? ` (rolls d20${signed(c.initMod)})` : c.initFormula ? ` (rolls ${escapeHtml(c.initFormula)})` : ""}">
           <button type="button" class="init-remove" data-act="remove" title="Remove" aria-label="Remove">&times;</button>
         </div>
@@ -5792,9 +5866,8 @@ function renderInitiativeOverlay() {
   const rows = list
     .map((c, i) => {
       const hp = !isPlayer && c.hp != null ? ` <em>${c.hp}${c.maxHp != null ? `/${c.maxHp}` : ""}</em>` : "";
-      const conc = c.concentration ? `<span class="init-conc-badge" title="Concentration" aria-label="Concentration">C</span>` : "";
-      const conds = conditionChipsHtml(tokenForCombatant(c.id));
-      return `<li class="${i === init.turn ? "current" : ""}"><span class="init-dot ${c.type}"></span><span class="init-ov-name">${escapeHtml(c.name)}</span>${conds}${conc}${hp}</li>`;
+      const conds = concentrationChipHtml(c) + conditionChipsHtml(tokenForCombatant(c.id));
+      return `<li class="${i === init.turn ? "current" : ""}"><span class="init-dot ${c.type}"></span><span class="init-ov-name">${escapeHtml(c.name)}</span>${conds}${hp}</li>`;
     })
     .join("");
   // GM gets turn arrows + a hide button in the header; the player just sees the round label.
