@@ -76,6 +76,8 @@ const controls = {
   tokenLabel: document.getElementById("tokenLabel"),
   tokenNote: document.getElementById("tokenNote"),
   tokenHidden: document.getElementById("tokenHidden"),
+  tokenVision: document.getElementById("tokenVision"),
+  tokenDarkvision: document.getElementById("tokenDarkvision"),
   tokenSelEdit: document.getElementById("tokenSelEdit"),
   tokenPanelHeading: document.getElementById("tokenPanelHeading"),
   tokenImage: document.getElementById("tokenImage"),
@@ -331,6 +333,9 @@ function makeFloor(id) {
     doors: [],
     lights: [],
     lighting: { ...DEFAULT_LIGHTING },
+    // Fog of war from what the party can see (see "vision"), and what it has seen so far.
+    vision: { enabled: false },
+    explored: "", // a small black-and-white image (data URL): white where the party has been
     view: { scale: 1, cx: 0, cy: 0, rotation: 0 },
   };
 }
@@ -366,6 +371,8 @@ const state = {
   doors: [],
   lights: [],
   lighting: { ...DEFAULT_LIGHTING },
+  vision: { enabled: false }, // the current floor's (see "vision")
+  explored: "",
   stairColor: "#ffffff", // GM-only stair marker color (stairs never show on the player display)
   // Initiative tracker: a turn order shared across all floors. When showPlayers is on, a
   // compact order overlay is mirrored to the player display.
@@ -513,11 +520,13 @@ function dispatchMessage(message, source) {
   if (message.type === "music" && isPlayer) applyMusicMessage(message);
   if (message.type === "dice" && isPlayer && message.roll) playDiceRoll(message.roll, audioUnlocked);
   if (message.type === "weather-flash" && isPlayer) weather?.flash();
+  if (message.type === "explored" && isPlayer) applyExploredMessage(message);
   if (message.type === "player-ready" && !isPlayer) {
     if (source) playerWindow = source;
     playerHasClip.clear(); // a new display has none of the audio yet
     broadcastAssets();
     broadcastState();
+    sendExplored();
     resyncMusicToPlayer();
   }
   if (message.type === "request-assets" && !isPlayer) broadcastAssets();
@@ -1477,6 +1486,8 @@ function bindControls() {
   // With a token selected in Move mode, the token fields edit that token live.
   ["tokenColor", "tokenCells", "tokenLabel", "tokenNote"].forEach((name) => controls[name]?.addEventListener("input", editSelectedToken));
   controls.tokenHidden?.addEventListener("change", editSelectedToken);
+  controls.tokenVision?.addEventListener("change", editSelectedToken);
+  controls.tokenDarkvision?.addEventListener("change", editSelectedToken);
   controls.tokenBulk?.addEventListener("change", (event) => {
     bulkAddTokenImages(event.target.files);
     event.target.value = ""; // allow re-selecting the same files
@@ -1795,6 +1806,8 @@ function loadMapFile(event) {
     state.doors = [];
     state.lights = [];
     state.lighting = { ...DEFAULT_LIGHTING };
+    state.vision = { enabled: false };
+    state.explored = "";
     state.imageId = uuid();
     state.map.scale = 1;
     state.fog.rooms = [];
@@ -1810,6 +1823,9 @@ function loadMapFile(event) {
       state.imageHeight = mapMedia.height;
       if (scene) applyVttScene(scene);
       else syncLightingControls();
+      if (state.vision.enabled) showGmNotice("Fog of war from vision is on: the players see nothing until a token is marked Player character (or linked to a Player row in the initiative).");
+      loadExplored(""); // a new map: nothing explored yet
+      sendExplored();
       fogDirty = true;
       captureCurrentFloor(); // flush new image into the current floor record
       updatePlayerSliderRanges();
@@ -2415,6 +2431,7 @@ function loadSnapshot(snapshot) {
     state.doors = Array.isArray(snapshot.doors) ? snapshot.doors : [];
     state.lights = Array.isArray(snapshot.lights) ? snapshot.lights : [];
     state.lighting = { ...DEFAULT_LIGHTING, ...snapshot.lighting };
+    state.vision = { enabled: false, ...snapshot.vision };
     Object.assign(state.view, snapshot.view || {});
     state.imageId = snapshot.imageId || state.imageId;
     state.imageData = snapshot.imageData || state.imageData; // keep the image assets delivered separately
@@ -2585,6 +2602,8 @@ function captureCurrentFloor() {
   floor.doors = state.doors.map((d) => ({ ...d }));
   floor.lights = state.lights;
   floor.lighting = { ...state.lighting };
+  floor.vision = { ...state.vision };
+  floor.explored = state.explored;
   floor.view = { ...state.view };
 }
 
@@ -2609,6 +2628,10 @@ function applyFloor(floor) {
   state.doors = (floor.doors || []).map((d) => ({ ...d }));
   state.lights = floor.lights || [];
   state.lighting = { ...DEFAULT_LIGHTING, ...floor.lighting };
+  state.vision = { enabled: false, ...floor.vision };
+  state.explored = floor.explored || "";
+  loadExplored(state.explored);
+  sendExplored(); // the player display picks it up once it has switched to this floor
   syncLightingControls();
   Object.assign(state.view, floor.view || { scale: 1, cx: 0, cy: 0 });
   state.view.rotation = floor.view?.rotation || 0; // default older floors with no rotation
@@ -2845,6 +2868,7 @@ function sanitizedState() {
   const clone = JSON.parse(JSON.stringify(rest));
   if (clone.splash) delete clone.splash.imageData;
   delete clone.notes; // floating notes are GM-only and never leave the GM window
+  delete clone.explored; // sent on its own when it changes (see "vision"), not with every sync
   // Handouts the GM hasn't shown yet stay behind (the player wouldn't draw them anyway).
   if (clone.images) clone.images = clone.images.filter((im) => im.showPlayers);
   // Hidden (stealth) tokens never leave the GM window either, and token notes are GM-only.
@@ -3411,6 +3435,7 @@ function render() {
   drawImages();
   drawTokens();
   drawLighting(); // darkness over the map and tokens, lit by the floor's lights
+  drawVisionFog(); // fog of war from what the party can see
   compositeFog();
   drawAoeMarkers(); // persistent AoE regions (above fog, below hover template)
   drawAoeTemplate(); // hover template sits above fog; visible to both GM and player
@@ -3534,8 +3559,10 @@ const LIGHT_GM_STRENGTH = 0.5;
 const LIGHT_OVERLAY_KEY = "lodestar.lightOverlay";
 const darkCanvas = document.createElement("canvas");
 const tintCanvas = document.createElement("canvas");
+const darkVisCanvas = document.createElement("canvas"); // the darkness, lifted by darkvision
 const lightCache = {}; // each light's shadow polygon, kept until walls/doors/lights change
 let lightSig = ""; // what the layers were last drawn for
+let darkVisSig = "";
 let lightOverlay = true; // GM: show walls, doors and lights on the map (remembered per browser)
 
 function lightingActive() {
@@ -3556,6 +3583,23 @@ function drawLighting() {
     LodestarLight.buildLightmap(darkCanvas, tintCanvas, { walls: state.walls, doors: state.doors, lights: state.lights, darkness: state.lighting.darkness }, scale, lightCache);
     lightSig = sig;
   }
+  // With vision on, darkvision lifts most of the darkness within its reach (see "vision").
+  let dark = darkCanvas;
+  if (visionActive()) {
+    ensureVision();
+    const key = `${lightSig}|${visionSig}`;
+    if (key !== darkVisSig) {
+      darkVisSig = key;
+      darkVisCanvas.width = w; // also clears it
+      darkVisCanvas.height = h;
+      const d = darkVisCanvas.getContext("2d");
+      d.drawImage(darkCanvas, 0, 0);
+      d.globalCompositeOperation = "destination-out";
+      d.globalAlpha = 0.7;
+      d.drawImage(dvCanvas, 0, 0, dvCanvas.width, dvCanvas.height, 0, 0, w, h);
+    }
+    dark = darkVisCanvas;
+  }
   ctx.save();
   ctx.imageSmoothingEnabled = true;
   ctx.globalAlpha = isPlayer ? 1 : 0.6;
@@ -3563,7 +3607,7 @@ function drawLighting() {
   ctx.drawImage(tintCanvas, 0, 0, w, h, 0, 0, state.imageWidth, state.imageHeight);
   ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = isPlayer ? 1 : LIGHT_GM_STRENGTH;
-  ctx.drawImage(darkCanvas, 0, 0, w, h, 0, 0, state.imageWidth, state.imageHeight);
+  ctx.drawImage(dark, 0, 0, w, h, 0, 0, state.imageWidth, state.imageHeight);
   ctx.restore();
 }
 
@@ -3648,6 +3692,8 @@ function applyVttScene(scene) {
   // Dark unless the map says it's lit by daylight (a near-white ambient light).
   const ambient = LodestarLight.luminance(scene.ambient);
   state.lighting = { enabled: state.lights.length > 0 && ambient < 0.95, darkness: ambient < 0.95 ? Math.min(0.95, Math.max(0.5, 1 - ambient)) : DEFAULT_LIGHTING.darkness };
+  // With walls, it's fog of war from what the party sees (see "vision").
+  state.vision = { enabled: state.walls.length > 0 };
   // The file's grid: one square is `cell` pixels.
   state.map.scale = 1;
   state.grid.size = Math.round(scene.cell * k * 100) / 100;
@@ -3681,6 +3727,14 @@ function setupLighting() {
     } catch {}
     render();
   });
+  const vision = document.getElementById("visionEnabled");
+  vision?.addEventListener("change", () => {
+    state.vision.enabled = vision.checked;
+    renderAndSync();
+  });
+  document.getElementById("visionReset")?.addEventListener("click", () => {
+    if (window.confirm("Forget everywhere the party has explored on this floor?")) resetExplored();
+  });
   syncLightingControls();
 }
 
@@ -3691,9 +3745,185 @@ function syncLightingControls() {
   enabled.checked = !!state.lighting.enabled;
   document.getElementById("lightingDarkness").value = String(state.lighting.darkness);
   document.getElementById("lightingOverlay").checked = lightOverlay;
+  const vision = document.getElementById("visionEnabled");
+  if (vision) vision.checked = !!state.vision.enabled;
   const info = document.getElementById("lightingInfo");
   const n = (count, one) => `${count} ${one}${count === 1 ? "" : "s"}`;
   if (info) info.textContent = state.walls.length || state.doors.length || state.lights.length ? `This floor: ${n(state.walls.length, "wall")} · ${n(state.doors.length, "door")} · ${n(state.lights.length, "light")}.` : "This floor has no walls or lights yet.";
+}
+
+/* ---- vision: fog of war from what the party can see ----
+With vision on for a floor, the player display shows only what the player characters can see:
+each one's line of sight, stopped by walls and closed doors, and, while it's dark (lighting on,
+darkness at least half), only where a light reaches or within that character's darkvision.
+Places the party has seen stay as a dimmed memory of the map, without its tokens, so monsters
+there stay hidden; the rest is black. A player character is a token marked so in its editor, or
+one linked to a Player row of the initiative. The GM works out what has been explored, saves it
+with the floor and sends it to the player display (which adds what it sees to it as it goes);
+both work out what's visible right now from the synced tokens. The GM sees the same picture as a
+light shade, so it's clear what the players can't see. The GM's own fog still applies on top. */
+
+const VISION_MAX_EDGE = 1024; // the masks are soft-edged anyway
+const VISION_MIN_MS = 120; // recompute at most this often (while a token is being dragged)
+const VISION_GM_STRENGTH = 0.35;
+const visCanvas = document.createElement("canvas"); // white where the party sees now
+const dvCanvas = document.createElement("canvas"); // the part of that seen by darkvision
+const exploredCanvas = document.createElement("canvas"); // white where it has ever seen
+const memoryCanvas = document.createElement("canvas"); // what's drawn: dimmed memory + black
+const memoryBlack = document.createElement("canvas");
+const visionCache = {};
+let visionSig = ""; // what visCanvas was last drawn for
+let memorySig = "";
+let visionAt = 0;
+let visionTimer = 0;
+let exploredTimer = 0;
+let exploredKey = ""; // the map + floor exploredCanvas belongs to
+let exploredVersion = 0;
+let pendingExplored = null; // player: the GM's explored map for a floor it hasn't reached yet
+
+function visionActive() {
+  return !!state.vision?.enabled && state.imageWidth > 0;
+}
+
+function visionKey() {
+  return `${state.imageId}|${state.currentFloorId}`;
+}
+
+function tokenIsViewer(t) {
+  if (t.hidden) return false;
+  if (t.vision) return true;
+  return !!t.combatantId && state.initiative.combatants.some((c) => c.id === t.combatantId && c.type === "player");
+}
+
+function visionSize() {
+  const scale = Math.min(1, VISION_MAX_EDGE / Math.max(state.imageWidth, state.imageHeight));
+  return { scale, w: Math.max(1, Math.round(state.imageWidth * scale)), h: Math.max(1, Math.round(state.imageHeight * scale)) };
+}
+
+function sizeVisionCanvases() {
+  const { w, h } = visionSize();
+  [visCanvas, dvCanvas, exploredCanvas, memoryCanvas, memoryBlack].forEach((c) => {
+    if (c.width !== w || c.height !== h) {
+      c.width = w;
+      c.height = h;
+    }
+  });
+}
+
+// Replace what's been explored with `dataUrl` (or nothing), for the current map and floor.
+function loadExplored(dataUrl) {
+  exploredKey = visionKey();
+  const key = exploredKey;
+  sizeVisionCanvases();
+  const ex = exploredCanvas.getContext("2d");
+  ex.setTransform(1, 0, 0, 1, 0, 0);
+  ex.clearRect(0, 0, exploredCanvas.width, exploredCanvas.height);
+  exploredVersion++;
+  visionSig = ""; // add what's visible now back on top
+  if (!dataUrl) return;
+  const img = new Image();
+  img.onload = () => {
+    if (exploredKey !== key) return; // moved on meanwhile
+    sizeVisionCanvases();
+    ex.drawImage(img, 0, 0, exploredCanvas.width, exploredCanvas.height);
+    exploredVersion++;
+    render();
+  };
+  img.src = dataUrl;
+}
+
+// GM: send what's been explored on this floor to the player display.
+function sendExplored() {
+  if (isPlayer) return;
+  relay({ type: "explored", key: visionKey(), data: state.explored });
+}
+
+function applyExploredMessage(message) {
+  if (message.key === visionKey()) loadExplored(message.data);
+  else pendingExplored = message; // for a floor or map the display hasn't switched to yet
+  render();
+}
+
+function resetExplored() {
+  state.explored = "";
+  loadExplored("");
+  sendExplored();
+  renderAndSync();
+}
+
+// Work out what the party sees now (no more often than VISION_MIN_MS), and add it to what
+// they've explored.
+function ensureVision() {
+  if (exploredKey !== visionKey()) {
+    if (isPlayer && pendingExplored?.key === visionKey()) loadExplored(pendingExplored.data);
+    else loadExplored(isPlayer ? "" : state.explored);
+    pendingExplored = null;
+  }
+  const { scale, w, h } = visionSize();
+  const viewers = state.tokens.filter(tokenIsViewer).map((t) => ({ x: t.x, y: t.y, darkvision: (t.darkvision || 0) * gridCellNative() }));
+  const dark = !!state.lighting.enabled && state.lighting.darkness >= 0.5;
+  const sig = `${visionKey()}|${w}x${h}|${dark}|${state.walls.length}|${state.doors.map((d) => (d.open ? 1 : 0)).join("")}|${state.lights.length}|${viewers.map((v) => `${Math.round(v.x)},${Math.round(v.y)},${v.darkvision}`).join(";")}`;
+  if (sig === visionSig) return;
+  const wait = VISION_MIN_MS - (performance.now() - visionAt);
+  if (wait > 0 && visionSig) {
+    clearTimeout(visionTimer);
+    visionTimer = setTimeout(render, wait); // keep showing the last picture until then
+    return;
+  }
+  visionAt = performance.now();
+  visionSig = sig;
+  sizeVisionCanvases();
+  LodestarLight.buildVision(visCanvas, { walls: state.walls, doors: state.doors, lights: state.lights, viewers, dark, sight: Math.hypot(state.imageWidth, state.imageHeight), exact: 20 * gridCellNative() }, scale, visionCache, dvCanvas);
+  if (!viewers.length) return;
+  exploredCanvas.getContext("2d").drawImage(visCanvas, 0, 0);
+  exploredVersion++;
+  if (!isPlayer) {
+    // Keep the saved copy (and the player display's) up to date, a moment after it settles.
+    clearTimeout(exploredTimer);
+    exploredTimer = setTimeout(() => {
+      state.explored = exploredCanvas.toDataURL("image/png");
+      sendExplored();
+    }, 500);
+  }
+}
+
+function drawVisionFog() {
+  if (!visionActive()) return;
+  ensureVision();
+  const { w, h } = visionSize();
+  const sig = `${visionSig}|${exploredVersion}|${mapMedia.source ? 1 : 0}`;
+  if (sig !== memorySig) {
+    memorySig = sig;
+    // The explored-but-unseen part: the map, dimmed, with no tokens on it.
+    const m = memoryCanvas.getContext("2d");
+    m.setTransform(1, 0, 0, 1, 0, 0);
+    m.globalCompositeOperation = "source-over";
+    m.clearRect(0, 0, w, h);
+    if (mapMedia.source) m.drawImage(mapMedia.source, 0, 0, w, h);
+    m.globalCompositeOperation = "source-atop";
+    m.fillStyle = "rgba(4, 5, 10, 0.62)";
+    m.fillRect(0, 0, w, h);
+    m.globalCompositeOperation = "destination-out";
+    m.drawImage(visCanvas, 0, 0);
+    m.globalCompositeOperation = "destination-in";
+    m.drawImage(exploredCanvas, 0, 0);
+    // The never-seen part: black.
+    const b = memoryBlack.getContext("2d");
+    b.setTransform(1, 0, 0, 1, 0, 0);
+    b.globalCompositeOperation = "source-over";
+    b.fillStyle = "#080909";
+    b.fillRect(0, 0, w, h);
+    b.globalCompositeOperation = "destination-out";
+    b.drawImage(exploredCanvas, 0, 0);
+    b.drawImage(visCanvas, 0, 0);
+    m.globalCompositeOperation = "source-over";
+    m.drawImage(memoryBlack, 0, 0);
+  }
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.globalAlpha = isPlayer ? 1 : VISION_GM_STRENGTH;
+  ctx.drawImage(memoryCanvas, 0, 0, w, h, 0, 0, state.imageWidth, state.imageHeight);
+  ctx.restore();
 }
 
 /* ----------------------------- fog ----------------------------- */
@@ -4617,6 +4847,8 @@ function syncTokenEditor() {
     controls.tokenLabel.value = token.label || "";
     if (controls.tokenNote) controls.tokenNote.value = token.note || "";
     if (controls.tokenHidden) controls.tokenHidden.checked = !!token.hidden;
+    if (controls.tokenVision) controls.tokenVision.checked = !!token.vision;
+    if (controls.tokenDarkvision) controls.tokenDarkvision.value = String(token.darkvision || 0);
   }
   updateTokenImagePreview();
   renderTokenConditions();
@@ -4638,6 +4870,11 @@ function editSelectedToken() {
   else delete token.note;
   if (controls.tokenHidden?.checked) token.hidden = true;
   else delete token.hidden;
+  if (controls.tokenVision?.checked) token.vision = true;
+  else delete token.vision;
+  const darkvision = Number(controls.tokenDarkvision?.value) || 0;
+  if (darkvision > 0) token.darkvision = darkvision;
+  else delete token.darkvision;
   renderAndSync();
 }
 

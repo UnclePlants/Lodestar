@@ -61,7 +61,7 @@ Prefer to run it offline? [Download the latest release](https://github.com/Uncle
 - **Splash screen and blackout** to show an image or a black screen between scenes.
 - **Weather** on the player display: rain, storms with lightning, snow, drifting fog, or rising embers, with intensity and wind, saved with each map.
 - **Smooth fades**: revealed fog fades away on the player display, and changing map or floor fades through black.
-- **VTT maps with walls, doors and lights**: load a Universal VTT file (`.dd2vtt` from Dungeondraft or Dungeon Alchemist, `.uvtt`, `.df2vtt`) and its grid comes in set up. The player display goes dark except where the lights reach; light stops at walls and closed doors, and you click a door to open it.
+- **VTT maps with walls, doors and lights**: load a Universal VTT file (`.dd2vtt` from Dungeondraft or Dungeon Alchemist, `.uvtt`, `.df2vtt`) and its grid comes in set up. The player display goes dark except where the lights reach; light stops at walls and closed doors, and you click a door to open it. **Fog of war from vision**: players see only what their characters can see (line of sight, light and darkvision), with explored places kept as a dimmed memory.
 
 ### Fog of war
 

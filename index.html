@@ -298,11 +298,17 @@
             <input id="lightingDarkness" type="range" min="0.2" max="1" step="0.05" value="0.8">
           </label>
           <label class="checkbox-row">
+            <input id="visionEnabled" type="checkbox">
+            <span>Fog of war from what the party sees</span>
+          </label>
+          <button id="visionReset" class="ghost-button" type="button" title="Forget the places the party has seen on this floor">Forget explored areas</button>
+          <label class="checkbox-row">
             <input id="lightingOverlay" type="checkbox" checked>
             <span>Show walls, doors and lights on my map</span>
           </label>
           <p class="hint" id="lightingInfo">This floor has no walls or lights yet.</p>
           <p class="hint">Load a Universal VTT map (<code>.dd2vtt</code> from Dungeondraft or Dungeon Alchemist, <code>.uvtt</code>, <code>.df2vtt</code>) with <strong>Load map</strong> to bring in its walls, doors and lights. Light stops at walls and closed doors; in Move mode, click a door to open or close it.</p>
+          <p class="hint">With fog of war from the party, players see only what their characters see; where they've been stays dimmed. Tick <strong>Player character</strong> on each hero's token, or link it to a Player row in the initiative.</p>
         </section>
 
         <section class="control-section">
@@ -492,6 +498,20 @@
               <label class="checkbox-row">
                 <input id="tokenHidden" type="checkbox">
                 <span>Hidden from players (stealth)</span>
+              </label>
+              <!-- Vision: with fog of war from walls on, players see what player characters see. -->
+              <label class="checkbox-row" title="With vision on (Lighting section), the players see what this character sees. Tokens linked to a Player row in the initiative count already.">
+                <input id="tokenVision" type="checkbox">
+                <span>Player character (players see what it sees)</span>
+              </label>
+              <label>
+                Darkvision
+                <select id="tokenDarkvision">
+                  <option value="0">None</option>
+                  <option value="6">6 squares (30 ft)</option>
+                  <option value="12">12 squares (60 ft)</option>
+                  <option value="24">24 squares (120 ft)</option>
+                </select>
               </label>
               <!-- Conditions: badges on the token (players see them unless marked GM-only). -->
               <div class="token-conds">

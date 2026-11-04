@@ -2120,6 +2120,10 @@ input:disabled {
   z-index: 8;
 }
 
+#visionReset {
+  justify-self: start;
+}
+
 .hint code {
   color: var(--text);
   font-size: 0.95em;
